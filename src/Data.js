@@ -87,6 +87,7 @@ export function usePlaces() {
 export function useNotifications(uid) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -97,12 +98,21 @@ export function useNotifications(uid) {
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         list.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
         setItems(list);
+        setError(null);
         setLoading(false);
       },
-      () => setLoading(false)
+      (err) => {
+        setError(err);
+        setLoading(false);
+      }
     );
   }, [uid]);
 
   const list = uid ? items : [];
-  return { items: list, loading: uid ? loading : false, unread: list.filter((n) => !n.read).length };
+  return {
+    items: list,
+    loading: uid ? loading : false,
+    error: uid ? error : null,
+    unread: list.filter((n) => !n.read).length,
+  };
 }

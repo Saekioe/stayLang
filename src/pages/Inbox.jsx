@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link as RouterLink, Navigate } from 'react-router-dom';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, Paper, Typography } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import { deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
@@ -85,7 +85,7 @@ function Message({ n, onRead, onDelete }) {
 
 export default function Inbox() {
   const { user, loading } = useAuth();
-  const { items, loading: loadingItems, unread } = useNotifications(user?.uid);
+  const { items, loading: loadingItems, error: loadError, unread } = useNotifications(user?.uid);
   const [error, setError] = useState('');
 
   if (loading) {
@@ -127,10 +127,20 @@ export default function Inbox() {
               Updates about your booking requests.
             </Typography>
           </Box>
-          {unread > 0 && (
-            <Button variant="outlined" onClick={markAllRead}>Mark all as read</Button>
-          )}
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button component={RouterLink} to="/my-bookings">My bookings</Button>
+            {unread > 0 && (
+              <Button variant="outlined" onClick={markAllRead}>Mark all as read</Button>
+            )}
+          </Box>
         </Box>
+
+        {loadError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            We could not load your messages. Make sure the latest Firestore rules are published,
+            because they add the notifications collection.
+          </Alert>
+        )}
 
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 

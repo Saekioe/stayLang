@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
-  AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Badge,
-  Drawer, List, ListItemButton, ListItemText,
+  AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Badge, Chip, Divider,
+  Drawer, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem,
 } from '@mui/material';
+import EventNoteIcon from '@mui/icons-material/EventNote';
 import InboxIcon from '@mui/icons-material/Inbox';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -14,7 +16,7 @@ import { useNotifications } from '../Data';
 
 const navLinks = [
   { label: 'Home', to: '/' },
-  { label: 'Deals', to: '/#about' },
+  { label: 'About', to: '/#about' },
   { label: 'Find Places', to: '/places' },
   { label: 'My Property', to: '/my-property' },
 ];
@@ -27,9 +29,13 @@ export default function NavigationBar() {
   const current =
     pathname === '/places' ? 'Find Places' : pathname === '/my-property' ? 'My Property' : active;
   const [open, setOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const menuOpen = Boolean(anchorEl);
+  const closeMenu = () => setAnchorEl(null);
 
   const displayName =
     profile?.firstName || user?.displayName || user?.email?.split('@')[0] || '';
+  const fullName = profile ? `${profile.firstName} ${profile.lastName}` : displayName;
 
   return (
     <AppBar id="home" position="fixed" elevation={0} sx={{ backgroundColor: '#ffffff', color: '#42403d' }}>
@@ -71,26 +77,67 @@ export default function NavigationBar() {
         <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
           {loading ? null : user ? (
             <>
-              <IconButton
-                component={RouterLink}
-                to="/inbox"
+
+              <Button
                 color="inherit"
-                aria-label={unread ? `Inbox, ${unread} unread` : 'Inbox'}
+                onClick={(e) => setAnchorEl(e.currentTarget)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen ? 'true' : undefined}
+                aria-controls={menuOpen ? 'account-menu' : undefined}
+                aria-label={unread ? `Account menu, ${unread} unread messages` : 'Account menu'}
+                endIcon={<KeyboardArrowDownIcon />}
+                sx={{
+                  borderRadius: 99,
+                  pl: 0.75,
+                  pr: 1.5,
+                  py: 0.5,
+                  border: '1px solid #d6d6d6',
+                  '&:hover': { bgcolor: '#F4F4F4' },
+                }}
               >
-                <Badge badgeContent={unread} color="primary" max={9}>
-                  <InboxIcon />
+                <Badge color="primary" variant="dot" invisible={!unread} overlap="circular">
+                  <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
+                  </Avatar>
                 </Badge>
-              </IconButton>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
-                </Avatar>
-                <Typography variant="body2" sx={{ fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, ml: 1, display: { xs: 'none', sm: 'block' } }}>
                   {displayName}
                 </Typography>
-              </Box>
-              <Button color="inherit" size="small" startIcon={<LogoutIcon />} onClick={logout} sx={{backgroundColor: '#D9D9D9', borderRadius: 99, px: 2, '&:hover': { bgcolor: '#CFCFCF' }}}>
-                Logout
               </Button>
+
+              <Menu
+                id="account-menu"
+                anchorEl={anchorEl}
+                open={menuOpen}
+                onClose={closeMenu}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{ paper: { sx: { mt: 1, minWidth: 240, borderRadius: '12px' } } }}
+              >
+                <Box sx={{ px: 2, py: 1.25, textAlign: 'left' }}>
+                  <Typography sx={{ fontWeight: 700 }} noWrap>{fullName}</Typography>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{user.email}</Typography>
+                </Box>
+                <Divider />
+                <MenuItem component={RouterLink} to="/my-bookings" onClick={closeMenu}>
+                  <ListItemIcon><EventNoteIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>My bookings</ListItemText>
+                </MenuItem>
+                <MenuItem component={RouterLink} to="/inbox" onClick={closeMenu}>
+                  <ListItemIcon><InboxIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>Inbox</ListItemText>
+                  {unread > 0 && <Chip size="small" color="primary" label={unread} sx={{ ml: 2 }} />}
+                </MenuItem>
+                <Divider />
+                <MenuItem
+                  onClick={() => {
+                    closeMenu();
+                    logout();
+                  }}
+                >
+                  <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>Logout</ListItemText>
+                </MenuItem>
+              </Menu>
             </>
           ) : (
             <>
