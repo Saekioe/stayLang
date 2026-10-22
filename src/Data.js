@@ -116,3 +116,24 @@ export function useNotifications(uid) {
     unread: list.filter((n) => !n.read).length,
   };
 }
+
+// Reviews for one property (newest first), updating live.
+export function usePropertyReviews(propertyId) {
+  const [reviews, setReviews] = useState([]);
+
+  useEffect(() => {
+    if (!propertyId) return undefined;
+    const q = query(collection(db, 'reviews'), where('propertyId', '==', propertyId));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        setReviews(list);
+      },
+      () => setReviews([])
+    );
+  }, [propertyId]);
+
+  return propertyId ? reviews : [];
+}

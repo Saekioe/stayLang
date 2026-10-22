@@ -5,6 +5,8 @@ import { auth, db } from './firebase';
 
 /* ---------- helpers ---------- */
 
+
+
 export function authMessage(code) {
   switch (code) {
     case 'auth/email-already-in-use':
@@ -25,6 +27,8 @@ export function authMessage(code) {
       return 'Something went wrong. Please try again.';
   }
 }
+
+
 
 // Accepts an email or a username and returns the email (or null if unknown).
 export async function resolveEmail(identifier) {

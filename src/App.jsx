@@ -8,10 +8,12 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import FindPlaces from './pages/Findplaces';
 import MyProperty from './pages/Myproperty';
+import MyBookings from './pages/MyBookings.jsx';
 import NavigationBar from './components/NavigationBar';
 import FrontPage from './components/FrontPage';
 import About from './components/About';
 import Places from './components/Places';
+import AdminDashboard from './pages/AdminDashboard';
 
 function Home() {
   return (
@@ -45,8 +47,11 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/places" element={<FindPlaces />} />
             <Route path="/my-property" element={<MyProperty />} />
+            <Route path="/my-bookings" element={<MyBookings />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            {/* Any address that is not listed above goes back to the home page */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

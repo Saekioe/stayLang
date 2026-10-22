@@ -3,6 +3,13 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Link, Typography } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+
+// MUI X Date Pickers imports
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+
 import { createUserWithEmailAndPassword, deleteUser, updateProfile } from 'firebase/auth';
 import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -11,7 +18,6 @@ import { Field, AuthCard } from '../components/Authui';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
-const today = new Date().toISOString().split('T')[0];
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -21,7 +27,7 @@ export default function Signup() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     email: '', password: '', confirm: '',
-    firstName: '', lastName: '', username: '', birthday: '', phone: '',
+    firstName: '', lastName: '', username: '', birthday: null, phone: '',
   });
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -45,6 +51,7 @@ export default function Signup() {
     if (!form.firstName.trim() || !form.lastName.trim()) return setError('Enter your first and last name.');
     if (!USERNAME_RE.test(username)) return setError('Username must be 3–20 characters: letters, numbers, "_" or ".".');
     if (!form.birthday) return setError('Enter your birthday.');
+    if (!form.phone) return setError('Enter your phone number.');
 
     setError('');
     setBusy(true);
@@ -70,7 +77,7 @@ export default function Signup() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         username,
-        birthday: form.birthday,
+        birthday: form.birthday.format('YYYY-MM-DD'),
         phone: form.phone.trim(),
         email,
       };
@@ -103,48 +110,62 @@ export default function Signup() {
   };
 
   return (
-    <AuthCard title="Signup" subtitle={`Step ${step} of 2`}>
-      {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <AuthCard title="Signup" subtitle={`Step ${step} of 2`}>
+        {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
 
-      {step === 1 ? (
-        <Box component="form" onSubmit={handleNext} noValidate>
-          <Field label="Email" type="email" value={form.email} onChange={set('email')} autoComplete="email" autoFocus />
-          <Field label="Password" type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
-          <Field label="Confirm Password" type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" />
-          <Button
-            type="submit"
-            variant="contained"
-            disableElevation
-            endIcon={<ArrowForwardIcon />}
-            sx={{ display: 'flex', mx: 'auto', mt: 2, borderRadius: '8px', px: 4 }}
-          >
-            Next
-          </Button>
-        </Box>
-      ) : (
-        <Box component="form" onSubmit={handleSubmit} noValidate>
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Field label="First name" value={form.firstName} onChange={set('firstName')} autoComplete="given-name" autoFocus />
-            <Field label="Last name" value={form.lastName} onChange={set('lastName')} autoComplete="family-name" />
-          </Box>
-          <Field label="Username" value={form.username} onChange={set('username')} autoComplete="username" />
-          <Field label="Birthday" type="date" value={form.birthday} onChange={set('birthday')} htmlInput={{ max: today }} autoComplete="bday" />
-          <Field label="Phone number (optional)" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 2 }}>
-            <Button startIcon={<ArrowBackIcon />} onClick={() => { setError(''); setStep(1); }} disabled={busy} color="inherit">
-              Back
-            </Button>
-            <Button type="submit" variant="contained" disableElevation disabled={busy} sx={{ borderRadius: '8px', px: 3 }}>
-              {busy ? 'Creating…' : 'Create account'}
+        {step === 1 ? (
+          <Box component="form" onSubmit={handleNext} noValidate>
+            <Field label="Email" type="email" value={form.email} onChange={set('email')} autoComplete="email" autoFocus />
+            <Field label="Password" type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
+            <Field label="Confirm Password" type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" />
+            <Button
+              type="submit"
+              variant="contained"
+              disableElevation
+              endIcon={<ArrowForwardIcon />}
+              sx={{ display: 'flex', mx: 'auto', mt: 2, borderRadius: '8px', px: 4 }}
+            >
+              Next
             </Button>
           </Box>
-        </Box>
-      )}
+        ) : (
+          <Box component="form" onSubmit={handleSubmit} noValidate>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Field label="First name" value={form.firstName} onChange={set('firstName')} autoComplete="given-name" autoFocus />
+              <Field label="Last name" value={form.lastName} onChange={set('lastName')} autoComplete="family-name" />
+            </Box>
+            <Field label="Username" value={form.username} onChange={set('username')} autoComplete="username" />
+            
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <DatePicker
+                label="Birthday"
+                value={form.birthday}
+                onChange={(newValue) => setForm((f) => ({ ...f, birthday: newValue }))}
+                maxDate={dayjs()}
+                slotProps={{
+                  textField: { size: 'small', fullWidth: true },
+                }}
+              />
+            </Box>
 
-      <Typography variant="body2" sx={{ textAlign: 'center', mt: 3 }}>
-        Already have an account?{' '}
-        <Link component={RouterLink} to="/login" underline="hover">Login</Link>
-      </Typography>
-    </AuthCard>
+            <Field label="Phone number" type="tel" value={form.phone} onChange={set('phone')} autoComplete="tel" />
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 2 }}>
+              <Button startIcon={<ArrowBackIcon />} onClick={() => { setError(''); setStep(1); }} disabled={busy} color="inherit">
+                Back
+              </Button>
+              <Button type="submit" variant="contained" disableElevation disabled={busy} sx={{ borderRadius: '8px', px: 3 }}>
+                {busy ? 'Creating…' : 'Create account'}
+              </Button>
+            </Box>
+          </Box>
+        )}
+
+        <Typography variant="body2" sx={{ textAlign: 'center', mt: 3 }}>
+          Already have an account?{' '}
+          <Link component={RouterLink} to="/login" underline="hover">Login</Link>
+        </Typography>
+      </AuthCard>
+    </LocalizationProvider>
   );
 }

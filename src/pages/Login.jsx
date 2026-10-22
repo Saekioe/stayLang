@@ -3,11 +3,13 @@ import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Divider, Typography } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
-import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
+import PersonIcon from '@mui/icons-material/Person';
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth, authMessage, resolveEmail } from '../Auth';
 import { Field, AuthCard } from '../components/Authui';
+
+const ADMIN_EMAILS = ['admin@staylang.com'];
 
 const grayBtn = {
   bgcolor: '#D9D9D9',
@@ -25,7 +27,11 @@ export default function Login() {
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) {
+    const userEmail = user.email?.toLowerCase() || '';
+    const isAdmin = ADMIN_EMAILS.some((email) => email.toLowerCase() === userEmail);
+    return <Navigate to={isAdmin ? '/admin/dashboard' : '/'} replace />;
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -39,7 +45,6 @@ export default function Login() {
         setError(authMessage('auth/user-not-found'));
       } else {
         await signInWithEmailAndPassword(auth, email, password);
-        navigate('/');
       }
     } catch (err) {
       setError(authMessage(err.code));
@@ -55,7 +60,6 @@ export default function Login() {
     try {
       const email = await resolveEmail(identifier);
       if (email) await sendPasswordResetEmail(auth, email);
-      // Same message either way so this can't be used to probe for accounts.
       setInfo('If an account exists, a password reset link has been sent to its email.');
     } catch (err) {
       setError(authMessage(err.code));
@@ -105,7 +109,7 @@ export default function Login() {
       </Divider>
 
       <Box sx={{ display: 'grid', gap: 1 }}>
-        <Button fullWidth startIcon={<PersonOutlineIcon />} onClick={() => navigate('/')} sx={grayBtn}>
+        <Button fullWidth startIcon={<PersonIcon />} onClick={() => navigate('/')} sx={grayBtn}>
           Continue as a guest
         </Button>
         <Button fullWidth component={RouterLink} to="/signup" startIcon={<PersonAddAltIcon />} sx={grayBtn}>
