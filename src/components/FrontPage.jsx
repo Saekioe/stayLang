@@ -1,6 +1,6 @@
 import { Box, Typography, Button, Stack } from '@mui/material';
 import ExploreIcon from '@mui/icons-material/Explore';
-import { labelFont, urbanist } from '../Theme';
+import { labelFont, urbanist } from '../font/Theme';
 import frontpage from '../assets/frontpage.png';
 import subimage from '../images/subimage.png';
 

@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, ButtonBase, Typography } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import { usePlaces } from '../Data';
+import { usePlaces } from '../dataqueries/Data';
 import PropertyDetails from './PropertyDetails';
-import { urbanist } from '../Theme';
+import { urbanist } from '../font/Theme';
 
 export function PlaceCard({ place, onSelect }) {
   if (!place) {

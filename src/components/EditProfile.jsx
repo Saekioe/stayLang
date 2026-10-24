@@ -3,7 +3,7 @@ import {
   Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert,
 } from '@mui/material';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firebase/firebase';
 
 export default function EditProfile({ open, onClose, user, profile }) {
   const [firstName, setFirstName] = useState(profile?.firstName || '');

@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import theme from './Theme';
-import { AuthProvider } from './Auth';
+import theme from './font/Theme';
+import { AuthProvider } from './auth/Auth';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import FindPlaces from './pages/Findplaces';
@@ -13,7 +13,7 @@ import NavigationBar from './components/NavigationBar';
 import FrontPage from './components/FrontPage';
 import About from './components/About';
 import Places from './components/Places';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminDashboard from './pages/adminpage/AdminDashboard';
 
 function Home() {
   return (

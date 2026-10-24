@@ -13,10 +13,10 @@ import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../Auth';
-import { labelFont } from '../Theme';
-import { usePropertyReviews } from '../Data';
+import { db } from '../firebase/firebase';
+import { useAuth } from '../auth/Auth';
+import { labelFont } from '../font/Theme';
+import { usePropertyReviews } from '../dataqueries/Data';
 
 const labelSx = { fontFamily: labelFont, fontWeight: 700, fontSize: '0.75rem', mt: 2.5, mb: 0.75 };
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;

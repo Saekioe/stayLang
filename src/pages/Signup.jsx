@@ -12,8 +12,8 @@ import dayjs from 'dayjs';
 
 import { createUserWithEmailAndPassword, deleteUser, updateProfile } from 'firebase/auth';
 import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import { useAuth, authMessage } from '../Auth';
+import { auth, db } from '../firebase/firebase';
+import { useAuth, authMessage } from '../auth/Auth';
 import { Field, AuthCard } from '../components/Authui';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

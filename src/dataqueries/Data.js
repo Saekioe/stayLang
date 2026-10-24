@@ -10,7 +10,7 @@ import PoolIcon from '@mui/icons-material/Pool';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TvIcon from '@mui/icons-material/Tv';
 import WifiIcon from '@mui/icons-material/Wifi';
-import { db } from './firebase/firebase';
+import { db } from '../firebase/firebase';
 
 // Hosts pick from these. Firestore stores only the `key`.
 export const amenityOptions = [

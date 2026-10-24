@@ -7,8 +7,8 @@ import {
 import {
   collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../Auth';
+import { db } from '../firebase/firebase';
+import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 
 // Set to true to let guests review only after their check-out date has passed.

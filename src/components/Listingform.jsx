@@ -5,9 +5,9 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../Auth';
-import { amenityOptions, propertyTypes } from '../Data';
+import { db } from '../firebase/firebase';
+import { useAuth } from '../auth/Auth';
+import { amenityOptions, propertyTypes } from '../dataqueries/Data';
 
 const MAX_IMAGES = 4;
 const MAX_IMAGE_CHARS = 850000; // keeps the whole document under Firestore's 1 MB limit

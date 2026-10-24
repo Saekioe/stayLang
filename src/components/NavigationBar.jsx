@@ -11,8 +11,8 @@ import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
-import { useAuth } from '../Auth';
-import { useNotifications } from '../Data';
+import { useAuth } from '../auth/Auth';
+import { useNotifications } from '../dataqueries/Data';
 import EditProfile from './EditProfile';
 
 const navLinks = [

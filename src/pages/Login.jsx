@@ -5,8 +5,8 @@ import LoginIcon from '@mui/icons-material/Login';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import PersonIcon from '@mui/icons-material/Person';
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
-import { useAuth, authMessage, resolveEmail } from '../Auth';
+import { auth } from '../firebase/firebase';
+import { useAuth, authMessage, resolveEmail } from '../auth/Auth';
 import { Field, AuthCard } from '../components/Authui';
 
 const ADMIN_EMAILS = ['admin@staylang.com'];

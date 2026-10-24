@@ -18,8 +18,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { collection, deleteDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../../Auth';
+import { db } from '../../firebase/firebase';
+import { useAuth } from '../../auth/Auth';
 
 const ADMIN_EMAILS = ['admin@staylang.com'];
 const SIDEBAR_WIDTH = 260;

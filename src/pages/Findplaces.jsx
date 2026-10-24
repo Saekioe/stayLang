@@ -13,7 +13,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import NavigationBar from '../components/NavigationBar';
 import { PlaceGrid } from '../components/Places';
-import { usePlaces } from '../Data';
+import { usePlaces } from '../dataqueries/Data';
 
 export default function FindPlaces() {
   const { places, error } = usePlaces();

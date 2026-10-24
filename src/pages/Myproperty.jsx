@@ -13,8 +13,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import {
   collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from '../Auth';
+import { db } from '../firebase/firebase';
+import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
 
