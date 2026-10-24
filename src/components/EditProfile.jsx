@@ -37,8 +37,8 @@ export default function EditProfile({ open, onClose, user, profile }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>Edit Account Information</DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { borderRadius: '12px' } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: 'black' }}>Edit Account Information</DialogTitle>
       <DialogContent dividers>
         {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
         {successMsg && <Alert severity="success" sx={{ mb: 2 }}>{successMsg}</Alert>}

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, Fade, IconButton, LinearProgress, Paper,
-  Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Typography,
+  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  Fade, IconButton, LinearProgress, Link, MenuItem, Paper, Rating,
+  Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CheckIcon from '@mui/icons-material/Check';
@@ -10,7 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import {
-  collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, where, writeBatch,
+  collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../Auth';
@@ -32,7 +33,7 @@ const ui = {
 
 const statusStyle = {
   pending: { bgcolor: ui.butter, color: '#6B5200' },
-  confirmed: { bgcolor: ui.sage, color: ui.sageText },
+  confirmed: { bgcolor: ui.tealSoft, color: ui.tealText },
   declined: { bgcolor: '#EFECEC', color: ui.muted },
 };
 
@@ -66,7 +67,7 @@ const rowSx = {
 };
 
 // ---------- dashboard numbers ----------
-function computeStats(properties, reservations) {
+function computeStats(properties, reservations, reviews) {
   const today = dayNum(toISODate(new Date()));
   const confirmed = reservations.filter((r) => r.status === 'confirmed');
   const pending = reservations.filter((r) => r.status === 'pending');
@@ -101,6 +102,7 @@ function computeStats(properties, reservations) {
   const perProperty = properties.map((p) => {
     const mine = reservations.filter((r) => r.propertyId === p.id);
     const conf = mine.filter((r) => r.status === 'confirmed');
+    const mineReviews = reviews.filter((rv) => rv.propertyId === p.id);
     const bookedNights = conf.reduce(
       (sum, r) => sum + Math.max(0, Math.min(dayNum(r.checkOut), windowEnd) - Math.max(dayNum(r.checkIn), today)),
       0
@@ -111,6 +113,8 @@ function computeStats(properties, reservations) {
       confirmed: conf.length,
       earnings: conf.reduce((sum, r) => sum + (r.total ?? 0), 0),
       occupancy: Math.min(100, Math.round((bookedNights / 30) * 100)),
+      ratingCount: mineReviews.length,
+      rating: mineReviews.length ? mineReviews.reduce((sum, rv) => sum + rv.rating, 0) / mineReviews.length : null,
     };
   });
 
@@ -127,8 +131,8 @@ function StatCard({ label, value, note, highlight }) {
   );
 }
 
-function Dashboard({ properties, reservations }) {
-  const s = useMemo(() => computeStats(properties, reservations), [properties, reservations]);
+function Dashboard({ properties, reservations, reviews }) {
+  const s = useMemo(() => computeStats(properties, reservations, reviews), [properties, reservations, reviews]);
   const maxMonth = Math.max(...s.months.map((m) => m.total), 1);
   const hasEarnings = s.months.some((m) => m.total > 0);
 
@@ -235,11 +239,12 @@ function Dashboard({ properties, reservations }) {
               <TableCell align="right">Requests</TableCell>
               <TableCell align="right">Confirmed</TableCell>
               <TableCell align="right">Earnings</TableCell>
+              <TableCell align="right">Rating</TableCell>
               <TableCell sx={{ minWidth: 150 }}>Booked, next 30 days</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {s.perProperty.map(({ p, requests, confirmed, earnings, occupancy }) => (
+            {s.perProperty.map(({ p, requests, confirmed, earnings, occupancy, rating, ratingCount }) => (
               <TableRow key={p.id}>
                 <TableCell>
                   <Typography sx={{ fontWeight: 600 }}>{p.title}</Typography>
@@ -248,6 +253,7 @@ function Dashboard({ properties, reservations }) {
                 <TableCell align="right">{requests}</TableCell>
                 <TableCell align="right">{confirmed}</TableCell>
                 <TableCell align="right">{money(earnings)}</TableCell>
+                <TableCell align="right">{rating === null ? 'No reviews' : `${rating.toFixed(1)} (${ratingCount})`}</TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <LinearProgress
@@ -354,51 +360,184 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
   );
 }
 
-function RequestRow({ r, onStatus }) {
-  const initials = (r.guestName || '?').split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
+function RequestRow({ r, review, onStatus, onReply }) {
   const pending = r.status === 'pending';
+  const placed = r.createdAt?.toDate
+    ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
   return (
-    <Box
-      sx={{
-        ...rowSx,
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: '1.2fr 1.5fr auto' },
-        gap: { xs: 1.5, md: 3 },
-        alignItems: 'center',
-        bgcolor: pending ? ui.butterTint : 'transparent',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-        <Avatar sx={{ bgcolor: ui.tealSoft, color: ui.tealText, fontWeight: 700 }}>{initials}</Avatar>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700 }} noWrap>{r.guestName}</Typography>
-          <Typography variant="body2" sx={{ color: ui.muted }} noWrap>{r.guestEmail}</Typography>
+    <Box sx={{ ...rowSx, bgcolor: pending ? ui.butterTint : 'transparent' }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1.2fr 1.5fr auto' },
+          gap: { xs: 1.5, md: 3 },
+          alignItems: 'center',
+        }}
+      >
+        {/* The booker */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+          <Avatar sx={{ bgcolor: ui.tealSoft, color: ui.tealText, fontWeight: 700 }}></Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700 }} noWrap>{r.guestName}</Typography>
+            <Typography variant="body2" sx={{ color: ui.muted }} noWrap>
+              <Link href={`mailto:${r.guestEmail}`} underline="hover" color="inherit">{r.guestEmail}</Link>
+            </Typography>
+            {r.guestPhone && (
+              <Typography variant="body2" sx={{ color: ui.muted }} noWrap>
+                <Link href={`tel:${r.guestPhone}`} underline="hover" color="inherit">{r.guestPhone}</Link>
+              </Typography>
+            )}
+          </Box>
+        </Box>
+
+        {/* The booking */}
+        <Box>
+          <Typography sx={{ fontWeight: 600 }}>{r.propertyTitle}</Typography>
+          <Typography variant="body2" sx={{ color: ui.muted }}>
+            {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.nights ?? 0, 'night')}
+          </Typography>
+          <Typography variant="body2" sx={{ color: ui.muted }}>
+            {plural(r.guests ?? 1, 'guest')}, ${r.total} total{placed ? `, requested ${placed}` : ''}
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Chip size="small" label={capitalize(r.status)} sx={{ fontWeight: 600, ...statusStyle[r.status] }} />
+          {pending && (
+            <>
+              <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} onClick={() => onStatus(r, 'confirmed')}>
+                Confirm
+              </Button>
+              <Button size="small" color="inherit" startIcon={<CloseIcon />} onClick={() => onStatus(r, 'declined')}>
+                Decline
+              </Button>
+            </>
+          )}
         </Box>
       </Box>
 
-      <Box>
-        <Typography sx={{ fontWeight: 600 }}>{r.propertyTitle}</Typography>
-        <Typography variant="body2" sx={{ color: ui.muted }}>
-          {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.nights ?? 0, 'night')}
-        </Typography>
-        <Typography variant="body2" sx={{ color: ui.muted }}>
-          {plural(r.guests ?? 1, 'guest')}, ${r.total} total
-        </Typography>
+      {/* The booker's review and your reply */}
+      {r.status === 'confirmed' && (
+        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px dashed ${ui.line}` }}>
+          {review ? (
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" sx={{ color: ui.muted, fontWeight: 600 }}>
+                  Review from {r.guestName}
+                </Typography>
+                <Rating value={review.rating} readOnly size="small" />
+                {review.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{review.text}</Typography>}
+                {review.hostReply && (
+                  <Typography variant="body2" sx={{ mt: 0.5, color: ui.tealText }}>
+                    Your reply: {review.hostReply}
+                  </Typography>
+                )}
+              </Box>
+              <Button size="small" onClick={() => onReply(review)}>
+                {review.hostReply ? 'Edit reply' : 'Reply'}
+              </Button>
+            </Box>
+          ) : (
+            <Typography variant="body2" sx={{ color: ui.muted }}>No review from this guest yet.</Typography>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+// ---------- ratings and reviews from your guests ----------
+function ReviewsPanel({ properties, reviews, onReply }) {
+  const [propertyId, setPropertyId] = useState('all');
+  const shown = propertyId === 'all' ? reviews : reviews.filter((r) => r.propertyId === propertyId);
+  const count = shown.length;
+  const average = count ? shown.reduce((sum, r) => sum + r.rating, 0) / count : null;
+  const distribution = [5, 4, 3, 2, 1].map((stars) => ({
+    stars,
+    n: shown.filter((r) => r.rating === stars).length,
+  }));
+
+  return (
+    <Box sx={{ textAlign: 'left' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1.4fr' }, gap: 2, mb: 3 }}>
+        <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5 }}>
+          <Typography variant="body2" sx={{ color: ui.muted, fontWeight: 600 }}>Average rating</Typography>
+          <Typography sx={{ fontSize: '2.5rem', fontWeight: 700, lineHeight: 1.2 }}>
+            {average === null ? 'None yet' : average.toFixed(1)}
+          </Typography>
+          <Rating value={average ?? 0} precision={0.1} readOnly />
+          <Typography variant="body2" sx={{ color: ui.muted }}>{plural(count, 'review')}</Typography>
+        </Paper>
+
+        <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5 }}>
+          <Typography sx={{ fontWeight: 700, mb: 1 }}>Ratings breakdown</Typography>
+          {distribution.map(({ stars, n }) => (
+            <Box key={stars} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
+              <Typography variant="body2" sx={{ width: 52 }}>{plural(stars, 'star')}</Typography>
+              <LinearProgress
+                variant="determinate"
+                value={count ? (n / count) * 100 : 0}
+                aria-label={`${n} of ${count} reviews are ${stars} stars`}
+                sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: ui.tealSoft }}
+              />
+              <Typography variant="body2" sx={{ width: 24, textAlign: 'right' }}>{n}</Typography>
+            </Box>
+          ))}
+        </Paper>
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-        <Chip size="small" label={capitalize(r.status)} sx={{ fontWeight: 600, ...statusStyle[r.status] }} />
-        {pending && (
-          <>
-            <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} onClick={() => onStatus(r, 'confirmed')}>
-              Confirm
-            </Button>
-            <Button size="small" color="inherit" startIcon={<CloseIcon />} onClick={() => onStatus(r, 'declined')}>
-              Decline
-            </Button>
-          </>
+      <TextField
+        select
+        size="small"
+        label="Property"
+        value={propertyId}
+        onChange={(e) => setPropertyId(e.target.value)}
+        sx={{ minWidth: 260, mb: 2 }}
+      >
+        <MenuItem value="all">All properties</MenuItem>
+        {properties.map((p) => (
+          <MenuItem key={p.id} value={p.id}>{p.title}</MenuItem>
+        ))}
+      </TextField>
+
+      <Paper elevation={0} sx={surfaceSx}>
+        {shown.length === 0 ? (
+          <EmptyState
+            title="No reviews yet"
+            text="Guests can review a place after you confirm their booking. Their reviews and ratings will show up here, and you can reply to each one."
+          />
+        ) : (
+          shown.map((r) => {
+            const date = r.createdAt?.toDate
+              ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+              : '';
+            return (
+              <Box key={r.id} sx={rowSx}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 700 }}>{r.guestName}</Typography>
+                    <Typography variant="body2" sx={{ color: ui.muted }}>
+                      {r.propertyTitle}{date ? `, ${date}` : ''}
+                    </Typography>
+                  </Box>
+                  <Rating value={r.rating} readOnly size="small" />
+                </Box>
+                {r.text && <Typography sx={{ mt: 1 }}>{r.text}</Typography>}
+                {r.hostReply && (
+                  <Box sx={{ mt: 1, pl: 1.5, borderLeft: `3px solid ${ui.tealSoft}` }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: ui.muted }}>Your reply</Typography>
+                    <Typography variant="body2">{r.hostReply}</Typography>
+                  </Box>
+                )}
+                <Button size="small" sx={{ mt: 1 }} onClick={() => onReply(r)}>
+                  {r.hostReply ? 'Edit reply' : 'Reply'}
+                </Button>
+              </Box>
+            );
+          })
         )}
-      </Box>
+      </Paper>
     </Box>
   );
 }
@@ -414,7 +553,11 @@ export default function MyProperty() {
   const [mode, setMode] = useState('list'); // 'list' | 'create' | 'edit'
   const [editing, setEditing] = useState(null);
   const [autoCreate, setAutoCreate] = useState(true);
-  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests
+  const [reviews, setReviews] = useState([]);
+  const [replying, setReplying] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [replySaving, setReplySaving] = useState(false);
+  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -436,9 +579,19 @@ export default function MyProperty() {
       },
       onError
     );
+    const unsubReviews = onSnapshot(
+      query(collection(db, 'reviews'), where('ownerId', '==', uid)),
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        setReviews(list);
+      },
+      () => {}
+    );
     return () => {
       unsubProps();
       unsubRes();
+      unsubReviews();
     };
   }, [uid]);
 
@@ -490,6 +643,30 @@ export default function MyProperty() {
   };
 
   const requestsFor = (id) => reservations.filter((r) => r.propertyId === id && r.status === 'pending').length;
+  const reviewsByReservation = Object.fromEntries(reviews.map((rv) => [rv.id, rv]));
+
+  // Public reply to a guest's review.
+  const openReply = (review) => {
+    setReplying(review);
+    setReplyText(review.hostReply ?? '');
+  };
+  const closeReply = () => {
+    if (!replySaving) setReplying(null);
+  };
+  const saveReply = async (text) => {
+    setReplySaving(true);
+    try {
+      await updateDoc(doc(db, 'reviews', replying.id), {
+        hostReply: text.trim(),
+        hostReplyAt: serverTimestamp(),
+      });
+      setReplying(null);
+    } catch {
+      setError('Could not save your reply. Make sure the latest Firestore rules are published.');
+    } finally {
+      setReplySaving(false);
+    }
+  };
 
   return (
     <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
@@ -580,11 +757,12 @@ export default function MyProperty() {
               <Tab label="Dashboard" />
               <Tab label={`Properties (${properties.length})`} />
               <Tab label={`Incoming guests (${reservations.length})`} />
+              <Tab label={`Reviews (${reviews.length})`} />
             </Tabs>
 
             <Fade in key={tab} timeout={250}>
               <Box>
-                {tab === 0 && <Dashboard properties={properties} reservations={reservations} />}
+                {tab === 0 && <Dashboard properties={properties} reservations={reservations} reviews={reviews} />}
 
                 {tab === 1 && (
                   <Paper elevation={0} sx={surfaceSx}>
@@ -620,15 +798,62 @@ export default function MyProperty() {
                         text="When a guest requests one of your places, they will show up here for you to confirm or decline."
                       />
                     ) : (
-                      reservations.map((r) => <RequestRow key={r.id} r={r} onStatus={setStatus} />)
+                      reservations.map((r) => (
+                        <RequestRow
+                          key={r.id}
+                          r={r}
+                          review={reviewsByReservation[r.id]}
+                          onStatus={setStatus}
+                          onReply={openReply}
+                        />
+                      ))
                     )}
                   </Paper>
                 )}
+
+                {tab === 3 && <ReviewsPanel properties={properties} reviews={reviews} onReply={openReply} />}
               </Box>
             </Fade>
           </>
         )}
       </Box>
+
+      <Dialog open={Boolean(replying)} onClose={closeReply} fullWidth maxWidth="sm" aria-labelledby="reply-title">
+        <DialogTitle id="reply-title" sx={{ textAlign: 'left' }}>
+          Reply to {replying?.guestName}
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'left' }}>
+          {replying && (
+            <Box sx={{ mb: 2 }}>
+              <Rating value={replying.rating} readOnly size="small" />
+              {replying.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{replying.text}</Typography>}
+            </Box>
+          )}
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            label="Your reply"
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+          />
+          <Typography variant="caption" sx={{ color: ui.muted, display: 'block', mt: 0.5 }}>
+            Your reply is shown publicly under the review.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {replying?.hostReply && (
+            <Button color="inherit" onClick={() => saveReply('')} disabled={replySaving} sx={{ mr: 'auto' }}>
+              Remove reply
+            </Button>
+          )}
+          <Button color="inherit" onClick={closeReply} disabled={replySaving}>Cancel</Button>
+          <Button variant="contained" onClick={() => saveReply(replyText)} disabled={replySaving || !replyText.trim()}>
+            {replySaving ? 'Saving…' : 'Save reply'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -47,6 +47,7 @@ const empty = {
   title: '', city: '', location: '', type: 'Apartment', description: '',
   capacity: '', bedrooms: '', beds: '', baths: '', pricePerNight: '', maxStay: '30',
   amenities: [], images: [],
+  hostName: '', hostEmail: '', hostPhone: '', hostBio: '',
 };
 
 const toNum = (v, fallback = 0) => (v === '' || Number.isNaN(Number(v)) ? fallback : Number(v));
@@ -63,6 +64,10 @@ function validate(f) {
   if (!(toNum(f.pricePerNight, NaN) > 0)) return 'Enter a base price per night.';
   if (!(toNum(f.maxStay, NaN) >= 1)) return 'Maximum stay must be at least 1 night.';
   if (!f.description.trim()) return 'Add a short description.';
+  if (!f.hostName.trim()) return 'Enter the host name.';
+  if (f.hostEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.hostEmail.trim())) {
+    return 'Enter a valid contact email.';
+  }
   if (f.images.length === 0) return 'Add at least one photo.';
   return '';
 }
@@ -103,11 +108,22 @@ const cardSx = {
 export default function ListingForm({ initial, onDone, onCancel }) {
   const { user, profile } = useAuth();
   const isEdit = Boolean(initial?.id);
+  // Host details start from the account and can be changed for each listing.
+  const hostDefaults = {
+    hostName: profile ? `${profile.firstName} ${profile.lastName}`.trim() : user?.displayName || '',
+    hostEmail: user?.email || '',
+    hostPhone: profile?.phone || '',
+    hostBio: '',
+  };
   const [form, setForm] = useState(() =>
     initial
       ? {
           ...empty,
           ...initial,
+          hostName: initial.hostName || hostDefaults.hostName,
+          hostEmail: initial.hostEmail ?? hostDefaults.hostEmail,
+          hostPhone: initial.hostPhone ?? hostDefaults.hostPhone,
+          hostBio: initial.hostBio ?? '',
           capacity: String(initial.capacity ?? ''),
           bedrooms: String(initial.bedrooms ?? ''),
           beds: String(initial.beds ?? ''),
@@ -117,7 +133,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           amenities: initial.amenities ?? [],
           images: initial.images ?? [],
         }
-      : empty
+      : { ...empty, ...hostDefaults }
   );
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -179,7 +195,10 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       amenities: form.amenities,
       images: form.images,
       published: true, // listings are live as soon as they are saved
-      hostName: profile?.firstName || user.displayName || '',
+      hostName: form.hostName.trim(),
+      hostBio: form.hostBio.trim(),
+      hostEmail: form.hostEmail.trim(),
+      hostPhone: form.hostPhone.trim(),
       updatedAt: serverTimestamp(),
     };
 
@@ -255,6 +274,24 @@ export default function ListingForm({ initial, onDone, onCancel }) {
               input={{ endAdornment: <InputAdornment position="end">nights</InputAdornment> }}
             />
           </Box>
+
+          <GroupLabel>Host information</GroupLabel>
+          <Typography variant="caption" sx={{ display: 'block', color: ui.muted, mt: -1, mb: 1.5 }}>
+            Guests see this on your listing. Leave the contact details empty to keep them private.
+          </Typography>
+          <FormField label="Host name" value={form.hostName} onChange={set('hostName')} />
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+            <FormField label="Contact email (optional)" value={form.hostEmail} onChange={set('hostEmail')} type="email" />
+            <FormField label="Contact phone (optional)" value={form.hostPhone} onChange={set('hostPhone')} type="tel" />
+          </Box>
+          <FormField
+            label="About the host (optional)"
+            multiline
+            minRows={2}
+            value={form.hostBio}
+            onChange={set('hostBio')}
+            htmlInput={{ maxLength: 400 }}
+          />
         </Box>
 
         {/* Right card */}

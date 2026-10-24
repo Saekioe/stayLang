@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Alert, Box, Button, ButtonBase, Chip, Dialog, IconButton, MenuItem, Rating, TextField, Typography,
+  Alert, Avatar, Box, Button, ButtonBase, Chip, Dialog, IconButton, Link, MenuItem, Rating, TextField, Typography,
 } from '@mui/material';
 import BathtubIcon from '@mui/icons-material/Bathtub';
 import BedIcon from '@mui/icons-material/Bed';
@@ -101,6 +101,7 @@ function Details({ place, onClose }) {
         guestId: user.uid,
         guestName: profile ? `${profile.firstName} ${profile.lastName}` : user.displayName || user.email,
         guestEmail: user.email,
+        guestPhone: profile?.phone || '',
         checkIn,
         checkOut,
         nights,
@@ -219,6 +220,35 @@ function Details({ place, onClose }) {
               </Box>
             </>
           )}
+
+          {place.host && (
+            <>
+              <Typography sx={labelSx}>Your host</Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', bgcolor: '#fff', border: '1px solid #D9D9D9', borderRadius: '12px', p: 2 }}>
+                <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.main' }}>
+                  {place.host.charAt(0).toUpperCase()}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700 }}>{place.host}</Typography>
+                  {place.hostBio && <Typography variant="body2" sx={{ mt: 0.5 }}>{place.hostBio}</Typography>}
+                  {(place.hostEmail || place.hostPhone) && (
+                    <Box sx={{ mt: 1 }}>
+                      {place.hostEmail && (
+                        <Typography variant="body2">
+                          <Link href={`mailto:${place.hostEmail}`} underline="hover">{place.hostEmail}</Link>
+                        </Typography>
+                      )}
+                      {place.hostPhone && (
+                        <Typography variant="body2">
+                          <Link href={`tel:${place.hostPhone}`} underline="hover">{place.hostPhone}</Link>
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </>
+          )}
         </Box>
 
         {/* Right: booking card + reviews */}
@@ -318,6 +348,14 @@ function Details({ place, onClose }) {
                     <Rating value={r.rating} readOnly size="small" />
                   </Box>
                   {r.text && <Typography variant="body2" sx={{ mt: 0.5 }}>{r.text}</Typography>}
+                  {r.hostReply && (
+                    <Box sx={{ mt: 1, pl: 1.5, borderLeft: '3px solid #E8F1F4' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                        Reply from {place.host || 'the host'}
+                      </Typography>
+                      <Typography variant="body2">{r.hostReply}</Typography>
+                    </Box>
+                  )}
                 </Box>
               ))}
             </Box>

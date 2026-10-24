@@ -10,7 +10,7 @@ import PoolIcon from '@mui/icons-material/Pool';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import TvIcon from '@mui/icons-material/Tv';
 import WifiIcon from '@mui/icons-material/Wifi';
-import { db } from './firebase';
+import { db } from './firebase/firebase';
 
 // Hosts pick from these. Firestore stores only the `key`.
 export const amenityOptions = [
@@ -45,6 +45,9 @@ export function toPlace(snap) {
     image: d.images?.[0] ?? '',
     images: d.images ?? [],
     host: d.hostName,
+    hostBio: d.hostBio ?? '',
+    hostEmail: d.hostEmail ?? '',
+    hostPhone: d.hostPhone ?? '',
     rating: d.rating ?? null,
     pricePerNight: d.pricePerNight,
     maxStay: d.maxStay ?? null,
