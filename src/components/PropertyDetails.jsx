@@ -157,7 +157,7 @@ function Details({ place, onClose }) {
           )}
 
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mt: 2 }}>
-            <Typography id="place-title" variant="h4" component="h2" sx={{ fontWeight: 500 }}>
+            <Typography id="place-title" variant="h4" component="h2" sx={{ fontWeight: 500, color: '#000000' }}>
               {place.name}
             </Typography>
             <IconButton
@@ -194,10 +194,12 @@ function Details({ place, onClose }) {
             )}
           </Box>
 
-          <Typography sx={labelSx}>Description:</Typography>
-          <Typography>{place.description}</Typography>
+          <Typography sx={{ fontFamily: labelFont, color: 'text.primary', fontWeight: 600, mt: 2, textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Description:</Typography>
+          <Box sx={{ bgcolor: '#fff', border: '1px solid #D9D9D9', borderRadius: '8px', p: 1.5, mb: 2 }}>
+          <Typography sx={{ fontSize: '0.9rem', color: 'text.primary' }}>{place.description}</Typography>
+          </Box>
 
-          <Typography sx={labelSx}>Where you'll sleep</Typography>
+          <Typography sx={{ fontFamily: labelFont, color: 'text.primary', fontWeight: 600, mt: 2, textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Where you'll sleep</Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {facts.map(({ Icon, text }) => (
               <Box
@@ -212,10 +214,10 @@ function Details({ place, onClose }) {
 
           {place.amenities.length > 0 && (
             <>
-              <Typography sx={labelSx}>Amenities:</Typography>
+              <Typography sx={{ fontFamily: labelFont, color: 'text.primary', fontWeight: 600, mt: 2, textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Amenities:</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {place.amenities.map(({ key, label, Icon }) => (
-                  <Chip key={key} size="small" variant="outlined" icon={<Icon />} label={label} sx={{ bgcolor: '#fff', fontFamily: labelFont, fontSize: '0.7rem' }} />
+                  <Chip key={key} size="medium" variant="outlined" icon={<Icon />} label={label} sx={{ bgcolor: '#fff', fontFamily: labelFont, fontSize: '0.7rem' }} />
                 ))}
               </Box>
             </>
@@ -223,10 +225,9 @@ function Details({ place, onClose }) {
 
           {place.host && (
             <>
-              <Typography sx={labelSx}>Your host</Typography>
+              <Typography sx={{ fontFamily: labelFont, color: 'text.primary', fontWeight: 600, mt: 2, textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Your host</Typography>
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', bgcolor: '#fff', border: '1px solid #D9D9D9', borderRadius: '12px', p: 2 }}>
                 <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.main' }}>
-                  {place.host.charAt(0).toUpperCase()}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 700 }}>{place.host}</Typography>
@@ -381,7 +382,7 @@ export default function PropertyDetails({ place, open, onClose }) {
       maxWidth="lg"
       scroll="body"
       aria-labelledby="place-title"
-      slotProps={{ paper: { sx: { bgcolor: '#F4F4F4', borderRadius: '16px' } } }}
+      slotProps={{ paper: { sx: { bgcolor: '#fafafa', borderRadius: '16px' } } }}
     >
       <Details key={place.id} place={place} onClose={onClose} />
     </Dialog>
