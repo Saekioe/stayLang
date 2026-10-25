@@ -11,13 +11,6 @@ import { Field, AuthCard } from '../components/Authui';
 
 const ADMIN_EMAILS = ['admin@staylang.com'];
 
-const grayBtn = {
-  bgcolor: '#D9D9D9',
-  color: 'text.primary',
-  borderRadius: '8px',
-  '&:hover': { bgcolor: '#CFCFCF' },
-};
-
 export default function Login() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -109,10 +102,18 @@ export default function Login() {
       </Divider>
 
       <Box sx={{ display: 'grid', gap: 1 }}>
-        <Button fullWidth startIcon={<PersonIcon />} onClick={() => navigate('/')} sx={grayBtn}>
+        <Button fullWidth startIcon={<PersonIcon />} onClick={() => navigate('/')} 
+        sx={{ bgcolor: '#D9D9D9',
+              color: 'text.primary',
+              borderRadius: '8px',
+              '&:hover': { bgcolor: '#CFCFCF' } }}>
           Continue as a guest
         </Button>
-        <Button fullWidth component={RouterLink} to="/signup" startIcon={<PersonAddAltIcon />} sx={grayBtn}>
+        <Button fullWidth component={RouterLink} to="/signup" startIcon={<PersonAddAltIcon />} 
+        sx={{ bgcolor: '#D9D9D9',
+              color: 'text.primary',
+              borderRadius: '8px',
+              '&:hover': { bgcolor: '#CFCFCF' } }}>
           Create an account
         </Button>
       </Box>

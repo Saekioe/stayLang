@@ -18,23 +18,10 @@ import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
 
-const ui = {
-  ink: '#3F3636',
-  muted: '#7A7070',
-  line: '#E6E3E3',
-  teal: '#457B91',
-  tealSoft: '#E8F1F4',
-  tealText: '#2F5E70',
-  butter: '#FBF1C0',
-  butterTint: '#FFFBE8',
-  sage: '#DFEEDF',
-  sageText: '#2E6B3F',
-};
-
 const statusStyle = {
-  pending: { bgcolor: ui.butter, color: '#6B5200' },
-  confirmed: { bgcolor: ui.tealSoft, color: ui.tealText },
-  declined: { bgcolor: '#EFECEC', color: ui.muted },
+  pending: { bgcolor: '#FBF1C0', color: '#6B5200' },
+  confirmed: { bgcolor: '#E8F1F4', color: '#2F5E70' },
+  declined: { bgcolor: '#EFECEC', color: '#7A7070' },
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -55,14 +42,14 @@ const dayNum = (iso) => {
 
 const surfaceSx = {
   bgcolor: '#ffffff',
-  border: `1px solid ${ui.line}`,
+  border: '1px solid #E6E3E3',
   borderRadius: '16px',
   overflow: 'hidden',
 };
 
 const rowSx = {
   p: 2,
-  borderTop: `1px solid ${ui.line}`,
+  borderTop: '1px solid #E6E3E3',
   '&:first-of-type': { borderTop: 0 },
 };
 
@@ -123,10 +110,10 @@ function computeStats(properties, reservations, reviews) {
 
 function StatCard({ label, value, note, highlight }) {
   return (
-    <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5, bgcolor: highlight ? ui.butterTint : '#fff' }}>
-      <Typography variant="body2" sx={{ color: ui.muted, fontWeight: 600 }}>{label}</Typography>
+    <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5, bgcolor: highlight ? '#FFFBE8' : '#fff' }}>
+      <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>{label}</Typography>
       <Typography sx={{ fontSize: '2rem', fontWeight: 700, lineHeight: 1.2, mt: 0.5 }}>{value}</Typography>
-      <Typography variant="body2" sx={{ color: ui.muted, mt: 0.25 }}>{note}</Typography>
+      <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.25 }}>{note}</Typography>
     </Paper>
   );
 }
@@ -166,7 +153,7 @@ function Dashboard({ properties, reservations, reviews }) {
         {/* Earnings by month */}
         <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5 }}>
           <Typography sx={{ fontWeight: 700 }}>Earnings by month</Typography>
-          <Typography variant="body2" sx={{ color: ui.muted }}>
+          <Typography variant="body2" sx={{ color: '#7A7070' }}>
             Confirmed bookings, by check-in month, for the last 6 months.
           </Typography>
           <Box
@@ -184,22 +171,22 @@ function Dashboard({ properties, reservations, reviews }) {
                     width: '100%',
                     maxWidth: 52,
                     height: m.total ? Math.max(6, Math.round((m.total / maxMonth) * 120)) : 4,
-                    bgcolor: m.total ? ui.teal : ui.line,
+                    bgcolor: m.total ? '#457B91' : '#E6E3E3',
                     borderRadius: '6px 6px 0 0',
                   }}
                 />
               </Box>
             ))}
           </Box>
-          <Box sx={{ display: 'flex', gap: 1.5, borderTop: `1px solid ${ui.line}`, pt: 0.75 }}>
+          <Box sx={{ display: 'flex', gap: 1.5, borderTop: '1px solid #E6E3E3', pt: 0.75 }}>
             {s.months.map((m) => (
-              <Typography key={m.key} variant="caption" sx={{ flex: 1, textAlign: 'center', color: ui.muted }}>
+              <Typography key={m.key} variant="caption" sx={{ flex: 1, textAlign: 'center', color: '#7A7070' }}>
                 {m.label}
               </Typography>
             ))}
           </Box>
           {!hasEarnings && (
-            <Typography variant="body2" sx={{ color: ui.muted, mt: 1.5 }}>
+            <Typography variant="body2" sx={{ color: '#7A7070', mt: 1.5 }}>
               Earnings will show up here once you confirm bookings.
             </Typography>
           )}
@@ -208,19 +195,19 @@ function Dashboard({ properties, reservations, reviews }) {
         {/* Upcoming stays */}
         <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5 }}>
           <Typography sx={{ fontWeight: 700 }}>Upcoming stays</Typography>
-          <Typography variant="body2" sx={{ color: ui.muted, mb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#7A7070', mb: 1 }}>
             Confirmed guests, soonest first.
           </Typography>
           {s.upcoming.length === 0 ? (
-            <Typography variant="body2" sx={{ color: ui.muted, mt: 2 }}>No upcoming stays yet.</Typography>
+            <Typography variant="body2" sx={{ color: '#7A7070', mt: 2 }}>No upcoming stays yet.</Typography>
           ) : (
             s.upcoming.slice(0, 4).map((r) => (
-              <Box key={r.id} sx={{ py: 1.25, borderTop: `1px solid ${ui.line}` }}>
+              <Box key={r.id} sx={{ py: 1.25, borderTop: '1px solid #E6E3E3' }}>
                 <Typography sx={{ fontWeight: 600 }} noWrap>{r.guestName}</Typography>
-                <Typography variant="body2" sx={{ color: ui.muted }} noWrap>
+                <Typography variant="body2" sx={{ color: '#7A7070' }} noWrap>
                   {r.propertyTitle}
                 </Typography>
-                <Typography variant="body2" sx={{ color: ui.muted }}>
+                <Typography variant="body2" sx={{ color: '#7A7070' }}>
                   {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.guests ?? 1, 'guest')}
                 </Typography>
               </Box>
@@ -248,7 +235,7 @@ function Dashboard({ properties, reservations, reviews }) {
               <TableRow key={p.id}>
                 <TableCell>
                   <Typography sx={{ fontWeight: 600 }}>{p.title}</Typography>
-                  <Typography variant="body2" sx={{ color: ui.muted }}>{p.city}</Typography>
+                  <Typography variant="body2" sx={{ color: '#7A7070' }}>{p.city}</Typography>
                 </TableCell>
                 <TableCell align="right">{requests}</TableCell>
                 <TableCell align="right">{confirmed}</TableCell>
@@ -260,7 +247,7 @@ function Dashboard({ properties, reservations, reviews }) {
                       variant="determinate"
                       value={occupancy}
                       aria-label={`${p.title} is booked ${occupancy} percent of the next 30 days`}
-                      sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: ui.tealSoft }}
+                      sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: '#E8F1F4' }}
                     />
                     <Typography variant="body2" sx={{ minWidth: 36, textAlign: 'right' }}>{occupancy}%</Typography>
                   </Box>
@@ -278,7 +265,7 @@ function EmptyState({ title, text, action }) {
   return (
     <Box sx={{ px: 3, py: 7, textAlign: 'center' }}>
       <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{title}</Typography>
-      <Typography sx={{ color: ui.muted, maxWidth: 420, mx: 'auto', mb: action ? 3 : 0 }}>{text}</Typography>
+      <Typography sx={{ color: '#7A7070', maxWidth: 420, mx: 'auto', mb: action ? 3 : 0 }}>{text}</Typography>
       {action}
     </Box>
   );
@@ -307,8 +294,8 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
           sx={{
             aspectRatio: '1.45',
             borderRadius: '10px',
-            bgcolor: ui.tealSoft,
-            color: ui.tealText,
+            bgcolor: '#E8F1F4',
+            color: '#2F5E70',
             display: 'grid',
             placeItems: 'center',
             fontSize: '0.75rem',
@@ -322,13 +309,13 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
           <Typography sx={{ fontWeight: 700, fontSize: '1.05rem' }} noWrap>{p.title}</Typography>
           {newRequests > 0 && (
-            <Chip size="small" label={plural(newRequests, 'new request')} sx={{ bgcolor: ui.butter, color: '#6B5200', fontWeight: 600 }} />
+            <Chip size="small" label={plural(newRequests, 'new request')} sx={{ bgcolor: '#FBF1C0', color: '#6B5200', fontWeight: 600 }} />
           )}
         </Box>
-        <Typography variant="body2" sx={{ color: ui.muted, mt: 0.25, textAlign: 'left' }} noWrap>
+        <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.25, textAlign: 'left' }} noWrap>
           {[p.city, p.type].filter(Boolean).join(', ')}
         </Typography>
-        <Typography variant="body2" sx={{ color: ui.muted, mt: 0.25, textAlign: 'left' }} noWrap>
+        <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.25, textAlign: 'left' }} noWrap>
           {plural(p.bedrooms ?? 0, 'bedroom')}, {plural(p.beds ?? 0, 'bed')}, {plural(p.baths ?? 0, 'bath')}, sleeps {p.capacity ?? 1}
         </Typography>
       </Box>
@@ -345,7 +332,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
       >
         <Typography sx={{ fontWeight: 700 }}>
           ${p.pricePerNight}
-          <Box component="span" sx={{ fontWeight: 400, color: ui.muted }}> per night</Box>
+          <Box component="span" sx={{ fontWeight: 400, color: '#7A7070' }}> per night</Box>
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => onEdit(p)}>
@@ -366,7 +353,7 @@ function RequestRow({ r, review, onStatus, onReply }) {
     ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
   return (
-    <Box sx={{ ...rowSx, bgcolor: pending ? ui.butterTint : 'transparent' }}>
+    <Box sx={{ ...rowSx, bgcolor: pending ? '#FFFBE8' : 'transparent' }}>
       <Box
         sx={{
           display: 'grid',
@@ -377,14 +364,14 @@ function RequestRow({ r, review, onStatus, onReply }) {
       >
         {/* The booker */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-          <Avatar sx={{ bgcolor: ui.tealSoft, color: ui.tealText, fontWeight: 700 }}></Avatar>
+          <Avatar sx={{ bgcolor: '#E8F1F4', color: '#2F5E70', fontWeight: 700 }}></Avatar>
           <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700 }} noWrap>{r.guestName}</Typography>
-            <Typography variant="body2" sx={{ color: ui.muted }} noWrap>
+            <Typography variant="body2" sx={{ color: '#7A7070' }} noWrap>
               <Link href={`mailto:${r.guestEmail}`} underline="hover" color="inherit">{r.guestEmail}</Link>
             </Typography>
             {r.guestPhone && (
-              <Typography variant="body2" sx={{ color: ui.muted }} noWrap>
+              <Typography variant="body2" sx={{ color: '#7A7070' }} noWrap>
                 <Link href={`tel:${r.guestPhone}`} underline="hover" color="inherit">{r.guestPhone}</Link>
               </Typography>
             )}
@@ -394,10 +381,10 @@ function RequestRow({ r, review, onStatus, onReply }) {
         {/* The booking */}
         <Box>
           <Typography sx={{ fontWeight: 600 }}>{r.propertyTitle}</Typography>
-          <Typography variant="body2" sx={{ color: ui.muted }}>
+          <Typography variant="body2" sx={{ color: '#7A7070' }}>
             {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.nights ?? 0, 'night')}
           </Typography>
-          <Typography variant="body2" sx={{ color: ui.muted }}>
+          <Typography variant="body2" sx={{ color: '#7A7070' }}>
             {plural(r.guests ?? 1, 'guest')}, ${r.total} total{placed ? `, requested ${placed}` : ''}
           </Typography>
         </Box>
@@ -419,17 +406,17 @@ function RequestRow({ r, review, onStatus, onReply }) {
 
       {/* The booker's review and your reply */}
       {r.status === 'confirmed' && (
-        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px dashed ${ui.line}` }}>
+        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed #E6E3E3' }}>
           {review ? (
             <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="body2" sx={{ color: ui.muted, fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>
                   Review from {r.guestName}
                 </Typography>
                 <Rating value={review.rating} readOnly size="small" />
                 {review.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{review.text}</Typography>}
                 {review.hostReply && (
-                  <Typography variant="body2" sx={{ mt: 0.5, color: ui.tealText }}>
+                  <Typography variant="body2" sx={{ mt: 0.5, color: '#2F5E70' }}>
                     Your reply: {review.hostReply}
                   </Typography>
                 )}
@@ -439,7 +426,7 @@ function RequestRow({ r, review, onStatus, onReply }) {
               </Button>
             </Box>
           ) : (
-            <Typography variant="body2" sx={{ color: ui.muted }}>No review from this guest yet.</Typography>
+            <Typography variant="body2" sx={{ color: '#7A7070' }}>No review from this guest yet.</Typography>
           )}
         </Box>
       )}
@@ -462,12 +449,12 @@ function ReviewsPanel({ properties, reviews, onReply }) {
     <Box sx={{ textAlign: 'left' }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1.4fr' }, gap: 2, mb: 3 }}>
         <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5 }}>
-          <Typography variant="body2" sx={{ color: ui.muted, fontWeight: 600 }}>Average rating</Typography>
+          <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>Average rating</Typography>
           <Typography sx={{ fontSize: '2.5rem', fontWeight: 700, lineHeight: 1.2 }}>
             {average === null ? 'None yet' : average.toFixed(1)}
           </Typography>
           <Rating value={average ?? 0} precision={0.1} readOnly />
-          <Typography variant="body2" sx={{ color: ui.muted }}>{plural(count, 'review')}</Typography>
+          <Typography variant="body2" sx={{ color: '#7A7070' }}>{plural(count, 'review')}</Typography>
         </Paper>
 
         <Paper elevation={0} sx={{ ...surfaceSx, p: 2.5 }}>
@@ -479,7 +466,7 @@ function ReviewsPanel({ properties, reviews, onReply }) {
                 variant="determinate"
                 value={count ? (n / count) * 100 : 0}
                 aria-label={`${n} of ${count} reviews are ${stars} stars`}
-                sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: ui.tealSoft }}
+                sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: '#E8F1F4' }}
               />
               <Typography variant="body2" sx={{ width: 24, textAlign: 'right' }}>{n}</Typography>
             </Box>
@@ -517,7 +504,7 @@ function ReviewsPanel({ properties, reviews, onReply }) {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 700 }}>{r.guestName}</Typography>
-                    <Typography variant="body2" sx={{ color: ui.muted }}>
+                    <Typography variant="body2" sx={{ color: '#7A7070' }}>
                       {r.propertyTitle}{date ? `, ${date}` : ''}
                     </Typography>
                   </Box>
@@ -525,8 +512,8 @@ function ReviewsPanel({ properties, reviews, onReply }) {
                 </Box>
                 {r.text && <Typography sx={{ mt: 1 }}>{r.text}</Typography>}
                 {r.hostReply && (
-                  <Box sx={{ mt: 1, pl: 1.5, borderLeft: `3px solid ${ui.tealSoft}` }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: ui.muted }}>Your reply</Typography>
+                  <Box sx={{ mt: 1, pl: 1.5, borderLeft: '3px solid #E8F1F4' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#7A7070' }}>Your reply</Typography>
                     <Typography variant="body2">{r.hostReply}</Typography>
                   </Box>
                 )}
@@ -691,14 +678,14 @@ export default function MyProperty() {
           <>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 3 }}>
               <Box>
-                <Typography sx={{ color: ui.muted, fontWeight: 600, textAlign: 'left' }}>StayLang Host</Typography>
+                <Typography sx={{ color: '#7A7070', fontWeight: 600, textAlign: 'left' }}>StayLang Host</Typography>
                 <Typography
                   component="h1"
                   sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1, mt: 0.5 }}
                 >
                   {firstName ? `Welcome back, ${firstName}` : 'Your properties'}
                 </Typography>
-                <Typography sx={{ color: ui.muted, mt: 1, textAlign: 'left' }}>
+                <Typography sx={{ color: '#7A7070', mt: 1, textAlign: 'left' }}>
                   Manage your places and see who is coming to stay.
                 </Typography>
               </Box>
@@ -721,7 +708,7 @@ export default function MyProperty() {
                   justifyContent: 'space-between',
                   flexWrap: 'wrap',
                   gap: 1.5,
-                  bgcolor: ui.butter,
+                  bgcolor: '#FBF1C0',
                   borderRadius: '14px',
                   px: 2.5,
                   py: 1.5,
@@ -738,7 +725,7 @@ export default function MyProperty() {
                   variant="contained"
                   disableElevation
                   onClick={() => setTab(2)}
-                  sx={{ bgcolor: '#fff', color: ui.ink, '&:hover': { bgcolor: '#fff' } }}
+                  sx={{ bgcolor: '#fff', color: '#3F3636', '&:hover': { bgcolor: '#fff' } }}
                 >
                   Review requests
                 </Button>
@@ -750,7 +737,7 @@ export default function MyProperty() {
               onChange={(_, v) => setTab(v)}
               sx={{
                 mb: 2,
-                borderBottom: `1px solid ${ui.line}`,
+                borderBottom: '1px solid #E6E3E3',
                 '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '1rem' },
               }}
             >
@@ -838,7 +825,7 @@ export default function MyProperty() {
             onChange={(e) => setReplyText(e.target.value)}
             slotProps={{ htmlInput: { maxLength: 500 } }}
           />
-          <Typography variant="caption" sx={{ color: ui.muted, display: 'block', mt: 0.5 }}>
+          <Typography variant="caption" sx={{ color: '#7A7070', display: 'block', mt: 0.5 }}>
             Your reply is shown publicly under the review.
           </Typography>
         </DialogContent>

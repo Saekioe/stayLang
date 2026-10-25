@@ -14,19 +14,10 @@ import NavigationBar from '../components/NavigationBar';
 // Set to true to let guests review only after their check-out date has passed.
 const ONLY_AFTER_CHECKOUT = false;
 
-const ui = {
-  muted: '#7A7070',
-  line: '#E6E3E3',
-  butter: '#FBF1C0',
-  butterTint: '#FFFBE8',
-  sage: '#DFEEDF',
-  sageText: '#2E6B3F',
-};
-
 const statusInfo = {
-  pending: { label: 'Waiting for the host', sx: { bgcolor: ui.butter, color: '#6B5200' } },
-  confirmed: { label: 'Confirmed', sx: { bgcolor: ui.sage, color: ui.sageText } },
-  declined: { label: 'Declined', sx: { bgcolor: '#EFECEC', color: ui.muted } },
+  pending: { label: 'Waiting for the host', sx: { bgcolor: '#FBF1C0', color: '#6B5200' } },
+  confirmed: { label: 'Confirmed', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
+  declined: { label: 'Declined', sx: { bgcolor: '#EFECEC', color: '#7A7070' } },
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -152,19 +143,19 @@ export default function MyBookings() {
         <Typography component="h1" sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1 }}>
           My bookings
         </Typography>
-        <Typography sx={{ color: ui.muted, mt: 1, mb: 3 }}>
+        <Typography sx={{ color: '#7A7070', mt: 1, mb: 3 }}>
           Your booking requests, what the host decided, and your reviews.
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        <Paper elevation={0} sx={{ bgcolor: '#fff', border: `1px solid ${ui.line}`, borderRadius: '16px', overflow: 'hidden' }}>
+        <Paper elevation={0} sx={{ bgcolor: '#fff', border: '1px solid #E6E3E3', borderRadius: '16px', overflow: 'hidden' }}>
           {!ready ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>
           ) : bookings.length === 0 ? (
             <Box sx={{ px: 3, py: 7, textAlign: 'center' }}>
               <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>No bookings yet</Typography>
-              <Typography sx={{ color: ui.muted, maxWidth: 420, mx: 'auto', mb: 3 }}>
+              <Typography sx={{ color: '#7A7070', maxWidth: 420, mx: 'auto', mb: 3 }}>
                 When you request a place, it will show up here with its status.
               </Typography>
               <Button variant="contained" component={RouterLink} to="/places">Find places</Button>
@@ -178,18 +169,18 @@ export default function MyBookings() {
                   key={b.id}
                   sx={{
                     p: 2,
-                    borderTop: `1px solid ${ui.line}`,
+                    borderTop: '1px solid #E6E3E3',
                     '&:first-of-type': { borderTop: 0 },
-                    bgcolor: b.status === 'pending' ? ui.butterTint : 'transparent',
+                    bgcolor: b.status === 'pending' ? '#FFFBE8' : 'transparent',
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography sx={{ fontWeight: 700 }}>{b.propertyTitle}</Typography>
-                      <Typography variant="body2" sx={{ color: ui.muted }}>
+                      <Typography variant="body2" sx={{ color: '#7A7070' }}>
                         {fmt(b.checkIn)} to {fmt(b.checkOut)}, {plural(b.nights ?? 0, 'night')}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: ui.muted }}>
+                      <Typography variant="body2" sx={{ color: '#7A7070' }}>
                         {plural(b.guests ?? 1, 'guest')}, ${b.total} total
                       </Typography>
                     </Box>
@@ -197,11 +188,11 @@ export default function MyBookings() {
                   </Box>
 
                   {b.status === 'confirmed' && (
-                    <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px dashed ${ui.line}` }}>
+                    <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed #E6E3E3' }}>
                       {review ? (
                         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ color: ui.muted, fontWeight: 600 }}>Your review</Typography>
+                            <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>Your review</Typography>
                             <Rating value={review.rating} readOnly size="small" />
                             {review.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{review.text}</Typography>}
                           </Box>
@@ -209,13 +200,13 @@ export default function MyBookings() {
                         </Box>
                       ) : canReview(b) ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-                          <Typography variant="body2" sx={{ color: ui.muted }}>
+                          <Typography variant="body2" sx={{ color: '#7A7070' }}>
                             How was your stay? Your review helps other guests.
                           </Typography>
                           <Button size="small" variant="outlined" onClick={() => openReview(b)}>Write a review</Button>
                         </Box>
                       ) : (
-                        <Typography variant="body2" sx={{ color: ui.muted }}>
+                        <Typography variant="body2" sx={{ color: '#7A7070' }}>
                           You can review this place after your stay ends on {fmt(b.checkOut)}.
                         </Typography>
                       )}
@@ -234,7 +225,7 @@ export default function MyBookings() {
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'left' }}>
           {reviewing && (
-            <Typography variant="body2" sx={{ color: ui.muted, mb: 2 }}>
+            <Typography variant="body2" sx={{ color: '#7A7070', mb: 2 }}>
               {reviewing.propertyTitle}, {fmt(reviewing.checkIn)} to {fmt(reviewing.checkOut)}
             </Typography>
           )}
@@ -256,7 +247,7 @@ export default function MyBookings() {
             onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
             slotProps={{ htmlInput: { maxLength: 1000 } }}
           />
-          <Typography variant="caption" sx={{ color: ui.muted, display: 'block', mt: 0.5 }}>
+          <Typography variant="caption" sx={{ color: '#7A7070', display: 'block', mt: 0.5 }}>
             Shown publicly as {publicName}.
           </Typography>
         </DialogContent>

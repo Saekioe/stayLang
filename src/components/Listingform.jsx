@@ -12,15 +12,6 @@ import { amenityOptions, propertyTypes } from '../dataqueries/Data';
 const MAX_IMAGES = 4;
 const MAX_IMAGE_CHARS = 850000; // keeps the whole document under Firestore's 1 MB limit
 
-const ui = {
-  muted: '#7A7070',
-  line: '#E6E3E3',
-  tealSoft: '#E8F1F4',
-  tealEdge: '#B9D0D9',
-  tealHover: '#DCEAEF',
-  butter: '#FBF1C0',
-};
-
 // Shrinks a photo in the browser and returns it as a small JPEG data URL.
 function compressImage(file, maxSize = 900, quality = 0.6) {
   return new Promise((resolve, reject) => {
@@ -90,7 +81,7 @@ function FormField({ label, htmlInput, input, ...props }) {
 
 function GroupLabel({ children }) {
   return (
-    <Typography sx={{ fontWeight: 700, color: ui.muted, fontSize: '0.85rem', mt: 1, mb: 1.5 }}>
+    <Typography sx={{ fontWeight: 700, color: '#7A7070', fontSize: '0.85rem', mt: 1, mb: 1.5 }}>
       {children}
     </Typography>
   );
@@ -98,7 +89,7 @@ function GroupLabel({ children }) {
 
 const cardSx = {
   bgcolor: '#fff',
-  border: `1px solid ${ui.line}`,
+  border: '1px solid #E6E3E3',
   borderRadius: '16px',
   boxShadow: '0 1px 3px rgba(63,54,54,.06)',
   p: { xs: 2.5, md: 4 },
@@ -223,14 +214,14 @@ export default function ListingForm({ initial, onDone, onCancel }) {
 
   return (
     <Box sx={{ backgroundColor: '#ffffff', p: { xs: 2, md: 0 }, borderRadius: '16px', boxShadow: '0 1px 3px rgba(63,54,54,.06)', mb: 4, maxWidth: 1800, mx: 'auto' }}>
-      <Typography sx={{ color: ui.muted, fontWeight: 500 }}>StayLang Host</Typography>
+      <Typography sx={{ color: '#7A7070', fontWeight: 500 }}>StayLang Host</Typography>
       <Typography
         component="h1"
         sx={{ fontSize: { xs: '2rem', md: '2.2rem' }, lineHeight: 1.1, mt: 0.5, color: '#000000', fontWeight: 600 }}
       >
         {isEdit ? 'Edit your Listing' : 'Create your Listing'}
       </Typography>
-      <Typography sx={{ color: ui.muted, mt: 1, mb: 2.5 }}>
+      <Typography sx={{ color: '#7A7070', mt: 1, mb: 2.5 }}>
         {isEdit
           ? 'Update the details below. Your changes go live when you save.'
           : 'Fill in the details below. Your listing goes live as soon as you publish it.'}
@@ -276,7 +267,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           </Box>
 
           <GroupLabel>Host information</GroupLabel>
-          <Typography variant="caption" sx={{ display: 'block', color: ui.muted, mt: -1, mb: 1.5 }}>
+          <Typography variant="caption" sx={{ display: 'block', color: '#7A7070', mt: -1, mb: 1.5 }}>
             Guests see this on your listing. Leave the contact details empty to keep them private.
           </Typography>
           <FormField label="Host name" value={form.hostName} onChange={set('hostName')} />
@@ -321,11 +312,11 @@ export default function ListingForm({ initial, onDone, onCancel }) {
               p: 3,
               textAlign: 'center',
               cursor: atLimit ? 'default' : 'pointer',
-              border: `2px solid ${dragging ? '#457B91' : ui.tealEdge}`,
-              bgcolor: dragging ? ui.tealHover : ui.tealSoft,
+              border: `2px solid ${dragging ? '#457B91' : '#B9D0D9'}`,
+              bgcolor: dragging ? '#DCEAEF' : '#E8F1F4',
               borderRadius: '14px',
               transition: 'background-color .15s, border-color .15s',
-              '&:hover': { bgcolor: atLimit ? ui.tealSoft : ui.tealHover },
+              '&:hover': { bgcolor: atLimit ? '#E8F1F4' : '#DCEAEF' },
               '&:focus-within': { outline: '2px solid #457B91', outlineOffset: 2 },
             }}
           >
@@ -333,7 +324,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
             <Typography sx={{ fontWeight: 600 }}>
               {atLimit ? 'You have added the maximum number of photos' : 'Click to upload or drag photos here'}
             </Typography>
-            <Typography variant="caption" sx={{ color: ui.muted }}>
+            <Typography variant="caption" sx={{ color: '#7A7070' }}>
               Up to {MAX_IMAGES} photos. The first one becomes the cover.
             </Typography>
             <input type="file" accept="image/*" multiple hidden disabled={atLimit} onChange={handleFiles} />
@@ -361,7 +352,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
                     <Chip
                       size="small"
                       label="Cover"
-                      sx={{ position: 'absolute', left: 6, bottom: 6, height: 20, bgcolor: ui.butter, fontSize: '0.7rem', fontWeight: 600 }}
+                      sx={{ position: 'absolute', left: 6, bottom: 6, height: 20, bgcolor: '#FBF1C0', fontSize: '0.7rem', fontWeight: 600 }}
                     />
                   )}
                 </Box>
@@ -383,7 +374,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
                   variant={on ? 'filled' : 'outlined'}
                   onClick={() => toggleAmenity(key)}
                   aria-pressed={on}
-                  sx={on ? undefined : { borderColor: ui.line, bgcolor: '#FBFAFA' }}
+                  sx={on ? undefined : { borderColor: '#E6E3E3', bgcolor: '#FBFAFA' }}
                 />
               );
             })}
@@ -408,7 +399,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           justifyContent: 'flex-end',
           gap: 1,
           bgcolor: '#fff',
-          borderTop: `1px solid ${ui.line}`,
+          borderTop: '1px solid #E6E3E3',
         }}
       >
         {onCancel && <Button color="inherit" onClick={onCancel} disabled={busy}>Cancel</Button>}

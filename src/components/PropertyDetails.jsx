@@ -18,7 +18,6 @@ import { useAuth } from '../auth/Auth';
 import { labelFont } from '../font/Theme';
 import { usePropertyReviews } from '../dataqueries/Data';
 
-const labelSx = { fontFamily: labelFont, fontWeight: 700, fontSize: '0.75rem', mt: 2.5, mb: 0.75 };
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // Dates are handled as local "YYYY-MM-DD" strings so time zones never shift them.

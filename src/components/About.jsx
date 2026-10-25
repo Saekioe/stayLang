@@ -11,8 +11,6 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 //   oldPrice: '2,756,000đ', image: '/images/hotel-1.jpg' }
 const deals = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
 
-const DARK_BLUE = '#1f4a9c';
-
 function DealCard({ deal }) {
   const [liked, setLiked] = useState(false);
 
@@ -81,7 +79,7 @@ function DealCard({ deal }) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.25 }}>
             <Box
               sx={{
-                bgcolor: DARK_BLUE,
+                bgcolor: '#1f4a9c',
                 color: '#fff',
                 fontSize: 11,
                 fontWeight: 700,
