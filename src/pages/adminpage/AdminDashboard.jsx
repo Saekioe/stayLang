@@ -50,54 +50,27 @@ function Overview({ users, properties, reservations }) {
     .reduce((sum, r) => sum + (r.total || 0), 0);
 
   return (
-    <>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>Platform Overview</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 4 }}>
-        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-          <Typography variant="body2" color="text.secondary">Total Accounts</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>{users.length}</Typography>
+    <Box>
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, color: '#0F172A' }}>Platform Overview</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2.5 }}>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Total Accounts</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#0F172A' }}>{users.length}</Typography>
         </Paper>
-        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-          <Typography variant="body2" color="text.secondary">Active Hosts</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>{hosts.length}</Typography>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Active Hosts</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#0F172A' }}>{hosts.length}</Typography>
         </Paper>
-        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-          <Typography variant="body2" color="text.secondary">Listings</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>{properties.length}</Typography>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Listings</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#0F172A' }}>{properties.length}</Typography>
         </Paper>
-        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e2e8f0' }}>
-          <Typography variant="body2" color="text.secondary">Total Volume</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5, color: '#2e7d32' }}>${totalEarnings.toLocaleString()}</Typography>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
+          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Total Volume</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#16A34A' }}>${totalEarnings.toLocaleString()}</Typography>
         </Paper>
       </Box>
-
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Manage</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-        {menuItems.filter((item) => item.path !== BASE).map((item) => (
-          <Button
-            key={item.label}
-            component={RouterLink}
-            to={item.path}
-            variant="outlined"
-            startIcon={item.icon}
-            sx={{
-              justifyContent: 'flex-start',
-              py: 1.75,
-              px: 2.5,
-              borderRadius: 3,
-              textTransform: 'none',
-              fontWeight: 600,
-              bgcolor: '#ffffff',
-              color: '#0f4a5f',
-              borderColor: '#e2e8f0',
-              '&:hover': { bgcolor: '#f1f5f9', borderColor: '#0f4a5f' },
-            }}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </Box>
-    </>
+    </Box>
   );
 }
 
@@ -150,64 +123,33 @@ export default function AdminDashboard() {
   };
 
   // Access Control Guard
-  if (loading) return <Box sx={{ py: 12, textAlign: 'center' }}><CircularProgress /></Box>;
+  if (loading) return <Box sx={{ py: 12, textAlign: 'center' }}><CircularProgress sx={{ color: '#1E3A8A' }} /></Box>;
   if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh' }}>
+    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh' }}>
       {/* Top Navigation Bar */}
-      <AppBar position="fixed" elevation={0} sx={{ backgroundColor: '#ffffff', color: '#42403d' }}>
-        <Toolbar sx={{ px: { xs: 1, md: 6 }, minHeight: NAV_HEIGHT, borderBottom: '0.1px solid #d6d6d6' }}>
+      <AppBar position="fixed" elevation={0} sx={{ backgroundColor: '#FFFFFF', color: '#0F172A', borderBottom: '1px solid #E2E8F0' }}>
+        <Toolbar sx={{ px: { xs: 2, md: 6 }, minHeight: NAV_HEIGHT, justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
             <IconButton
               color="inherit"
               aria-label="Open menu"
               onClick={() => setMobileOpen(true)}
-              sx={{ display: { lg: 'none' }, mr: 0.5 }}
+              sx={{ display: { lg: 'none' }, mr: 1 }}
             >
               <MenuIcon />
             </IconButton>
             <Box>
-              <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: '#0f4a5f', lineHeight: 1.2 }}>
+              <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: '#457B91', lineHeight: 1.2 }}>
                 StayLang
               </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1 }}>
+              <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1, fontWeight: 500 }}>
                 Admin Control Panel
               </Typography>
             </Box>
-          </Box>
-
-          {/* Nav links (desktop) */}
-          <Box
-            sx={{
-              flex: 1,
-              display: { xs: 'none', lg: 'flex' },
-              justifyContent: 'center',
-              gap: 0.5,
-              px: 2,
-              overflowX: 'auto',
-            }}
-          >
-            {menuItems.map((item) => (
-              <Button
-                key={item.label}
-                component={RouterLink}
-                to={item.path}
-                color="inherit"
-                size="small"
-                sx={{
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  textDecoration: isActive(item.path) ? 'underline' : 'none',
-                  textUnderlineOffset: 4,
-                  color: isActive(item.path) ? '#0f4a5f' : 'inherit',
-                }}
-              >
-                {item.label}
-              </Button>
-            ))}
           </Box>
 
           <Box sx={{ flex: 1, display: { lg: 'none' } }} />
@@ -218,12 +160,14 @@ export default function AdminDashboard() {
             startIcon={<LogoutIcon />}
             sx={{
               borderRadius: 99,
-              px: 2,
-              py: 0.5,
+              px: 2.5,
+              py: 0.75,
               fontWeight: 600,
+              fontSize: '0.875rem',
               flexShrink: 0,
-              border: '1px solid #d6d6d6',
-              '&:hover': { bgcolor: '#F4F4F4' },
+              color: '#457B91',
+              border: '1px solid #CBD5E1',
+              '&:hover': { bgcolor: '#F1F5F9', borderColor: '#457B91' },
             }}
           >
             Logout
@@ -232,51 +176,123 @@ export default function AdminDashboard() {
 
         {/* Mobile drawer */}
         <Drawer anchor="left" open={mobileOpen} onClose={() => setMobileOpen(false)}>
-          <List sx={{ width: 260 }}>
+          <List sx={{ width: 260, pt: 2, bgcolor: '#FFFFFF', height: '100%' }}>
             {menuItems.map((item) => (
-              <ListItem key={item.label} disablePadding>
+              <ListItem key={item.label} disablePadding sx={{ px: 1, mb: 0.5 }}>
                 <ListItemButton
                   component={RouterLink}
                   to={item.path}
                   selected={isActive(item.path)}
                   onClick={() => setMobileOpen(false)}
+                  sx={{
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      bgcolor: '#EEF2F6',
+                      color: '#1E3A8A',
+                      '& .MuiListItemIcon-root': { color: '#1E3A8A' },
+                    },
+                  }}
                 >
-                  <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.label} />
+                  <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: 600, fontSize: '0.9rem' }} />
                 </ListItemButton>
               </ListItem>
             ))}
           </List>
-          <Divider />
-          <List>
+          <Divider sx={{ my: 1 }} />
+          <List sx={{ px: 1 }}>
             <ListItem disablePadding>
-              <ListItemButton onClick={handleLogout}>
-                <ListItemIcon sx={{ minWidth: 40 }}><LogoutIcon /></ListItemIcon>
-                <ListItemText primary="Logout" />
+              <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2 }}>
+                <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}><LogoutIcon /></ListItemIcon>
+                <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 600, fontSize: '0.9rem' }} />
               </ListItemButton>
             </ListItem>
           </List>
         </Drawer>
       </AppBar>
 
-      {/* Main Content Area with routes */}
-      <Box component="main" sx={{ pt: `${NAV_HEIGHT + 32}px`, px: { xs: 2, md: 6 }, pb: 4 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {/* Main Content Area with 20-80 Grid persistent across all pages */}
+      <Box component="main" sx={{ pt: `${NAV_HEIGHT + 32}px`, px: { xs: 2, md: 6 }, pb: 6 }}>
+        {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-        <Routes>
-          <Route
-            index
-            element={<Overview users={users} properties={properties} reservations={reservations} />}
-          />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="hosts" element={<HostManagement />} />
-          <Route path="properties" element={<PropertyManagement />} />
-          <Route path="reservations" element={<ReservationMonitoring />} />
-          <Route path="reviews" element={<ReviewModeration />} />
-          <Route path="reports" element={<Report />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to={BASE} replace />} />
-        </Routes>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '20% 80%' }, gap: 4, alignItems: 'flex-start' }}>
+          {/* 20% Column: Persistent Navigation Buttons */}
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              flexDirection: 'column',
+              gap: 1,
+              bgcolor: '#FFFFFF',
+              p: 2,
+              borderRadius: 3,
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 1px 10px rgba(0,0,0,0.02)',
+            }}
+          >
+            {menuItems.map((item) => {
+              const active = isActive(item.path);
+              return (
+                <Button
+                  key={item.label}
+                  component={RouterLink}
+                  to={item.path}
+                  variant={active ? 'contained' : 'text'}
+                  startIcon={item.icon}
+                  sx={{
+                    justifyContent: 'flex-start',
+                    py: 1.5,
+                    px: 2,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    bgcolor: active ? '#457B91' : 'transparent',
+                    color: active ? '#FFFFFF' : '#475569',
+                    boxShadow: 'none',
+                    '& .MuiButton-startIcon': {
+                      color: active ? '#FFFFFF' : '#64748B',
+                    },
+                    '&:hover': {
+                      bgcolor: active ? '#457B91' : '#F8FAFC',
+                      color: active ? '#FFFFFF' : '#1E293B',
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  {item.label}
+                </Button>
+              );
+            })}
+          </Box>
+
+          {/* 80% Column: Dynamic Sub-page Content */}
+          <Box
+            sx={{
+              width: '100%',
+              minWidth: 0,
+              bgcolor: '#FFFFFF',
+              p: { xs: 2.5, md: 4 },
+              borderRadius: 3,
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            }}
+          >
+            <Routes>
+              <Route
+                index
+                element={<Overview users={users} properties={properties} reservations={reservations} />}
+              />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="hosts" element={<HostManagement />} />
+              <Route path="properties" element={<PropertyManagement />} />
+              <Route path="reservations" element={<ReservationMonitoring />} />
+              <Route path="reviews" element={<ReviewModeration />} />
+              <Route path="reports" element={<Report />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to={BASE} replace />} />
+            </Routes>
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

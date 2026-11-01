@@ -14,7 +14,7 @@ export default function Settings() {
   return (
     <>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>Categories & Platform Settings</Typography>
-      <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', maxWidth: 600 }}>
+      <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0', maxWidth: 'auto' }}>
         <Typography variant="h6" sx={{ mb: 2 }}>Manage Property Categories</Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
           <TextField

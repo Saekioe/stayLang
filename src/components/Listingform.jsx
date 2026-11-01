@@ -55,10 +55,16 @@ function validate(f) {
   if (!(toNum(f.pricePerNight, NaN) > 0)) return 'Enter a base price per night.';
   if (!(toNum(f.maxStay, NaN) >= 1)) return 'Maximum stay must be at least 1 night.';
   if (!f.description.trim()) return 'Add a short description.';
+  
+  // Host information validation (all required now)
   if (!f.hostName.trim()) return 'Enter the host name.';
-  if (f.hostEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.hostEmail.trim())) {
+  if (!f.hostEmail.trim()) return 'Enter a contact email.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.hostEmail.trim())) {
     return 'Enter a valid contact email.';
   }
+  if (!f.hostPhone.trim()) return 'Enter a contact phone number.';
+  if (!f.hostBio.trim()) return 'Add a short bio about the host.';
+
   if (f.images.length === 0) return 'Add at least one photo.';
   return '';
 }
@@ -69,6 +75,7 @@ function FormField({ label, htmlInput, input, ...props }) {
     <Box sx={{ mb: 2 }}>
       <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', mb: 0.5 }}>{label}</Typography>
       <TextField
+        required
         fullWidth
         size="small"
         slotProps={{ htmlInput: { 'aria-label': label, ...htmlInput }, input }}
@@ -268,15 +275,15 @@ export default function ListingForm({ initial, onDone, onCancel }) {
 
           <GroupLabel>Host information</GroupLabel>
           <Typography variant="caption" sx={{ display: 'block', color: '#7A7070', mt: -1, mb: 1.5 }}>
-            Guests see this on your listing. Leave the contact details empty to keep them private.
+            Guests see this on your listing. All host contact details are required.
           </Typography>
           <FormField label="Host name" value={form.hostName} onChange={set('hostName')} />
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-            <FormField label="Contact email (optional)" value={form.hostEmail} onChange={set('hostEmail')} type="email" />
-            <FormField label="Contact phone (optional)" value={form.hostPhone} onChange={set('hostPhone')} type="tel" />
+            <FormField label="Contact email" value={form.hostEmail} onChange={set('hostEmail')} type="email" />
+            <FormField label="Contact phone" value={form.hostPhone} onChange={set('hostPhone')} type="tel" />
           </Box>
           <FormField
-            label="About the host (optional)"
+            label="About the host"
             multiline
             minRows={2}
             value={form.hostBio}
