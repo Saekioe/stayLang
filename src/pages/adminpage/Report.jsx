@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, Paper, Typography } from '@mui/material';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
+import { money } from '../../dataqueries/Booking';
 
 export default function Report() {
   const [reservations, setReservations] = useState([]);
@@ -25,7 +26,7 @@ export default function Report() {
       <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #e2e8f0' }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Booking Volume Summary</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Total confirmed platform revenue stands at ${totalEarnings.toLocaleString()}.
+          Total confirmed platform revenue stands at {money(totalEarnings)}.
         </Typography>
         <Box sx={{ display: 'flex', gap: 4 }}>
           <Box>

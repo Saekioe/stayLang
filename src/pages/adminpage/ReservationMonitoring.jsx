@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
+import { money } from '../../dataqueries/Booking';
 
 export default function ReservationMonitoring() {
   const [reservations, setReservations] = useState([]);
@@ -42,7 +43,7 @@ export default function ReservationMonitoring() {
                   <TableCell sx={{ fontWeight: 600 }}>{r.guestName}</TableCell>
                   <TableCell>{r.propertyTitle}</TableCell>
                   <TableCell>{r.checkIn} to {r.checkOut}</TableCell>
-                  <TableCell>${r.total}</TableCell>
+                  <TableCell>{money(r.total)}</TableCell>
                   <TableCell>
                     <Chip size="small" label={r.status} color={r.status === 'confirmed' ? 'success' : r.status === 'pending' ? 'warning' : 'default'} />
                   </TableCell>

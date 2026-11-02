@@ -36,7 +36,7 @@ function compressImage(file, maxSize = 900, quality = 0.6) {
 
 const empty = {
   title: '', city: '', location: '', type: 'Apartment', description: '',
-  capacity: '', bedrooms: '', beds: '', baths: '', pricePerNight: '', maxStay: '30',
+  capacity: '', bedrooms: '', beds: '', baths: '', pricePerNight: '', maxStay: '30', cleaningFee: '0',
   amenities: [], images: [],
   hostName: '', hostEmail: '', hostPhone: '', hostBio: '',
 };
@@ -54,6 +54,7 @@ function validate(f) {
   if (!(toNum(f.baths, NaN) >= 0)) return 'Enter the number of baths.';
   if (!(toNum(f.pricePerNight, NaN) > 0)) return 'Enter a base price per night.';
   if (!(toNum(f.maxStay, NaN) >= 1)) return 'Maximum stay must be at least 1 night.';
+  if (!(toNum(f.cleaningFee, 0) >= 0)) return 'Cleaning fee cannot be negative.';
   if (!f.description.trim()) return 'Add a short description.';
   
   // Host information validation (all required now)
@@ -128,6 +129,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           baths: String(initial.baths ?? ''),
           pricePerNight: String(initial.pricePerNight ?? ''),
           maxStay: String(initial.maxStay ?? 30),
+          cleaningFee: String(initial.cleaningFee ?? 0),
           amenities: initial.amenities ?? [],
           images: initial.images ?? [],
         }
@@ -190,6 +192,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       baths: toNum(form.baths),
       pricePerNight: toNum(form.pricePerNight),
       maxStay: toNum(form.maxStay, 30),
+      cleaningFee: toNum(form.cleaningFee, 0),
       amenities: form.amenities,
       images: form.images,
       hostName: form.hostName.trim(),
@@ -261,7 +264,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
               onChange={set('pricePerNight')}
               type="number"
               htmlInput={{ min: 0 }}
-              input={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              input={{ startAdornment: <InputAdornment position="start">₱</InputAdornment> }}
             />
             <FormField
               label="Maximum Stay"
@@ -270,6 +273,14 @@ export default function ListingForm({ initial, onDone, onCancel }) {
               type="number"
               htmlInput={{ min: 1 }}
               input={{ endAdornment: <InputAdornment position="end">nights</InputAdornment> }}
+            />
+            <FormField
+              label="Cleaning fee (per stay)"
+              value={form.cleaningFee}
+              onChange={set('cleaningFee')}
+              type="number"
+              htmlInput={{ min: 0 }}
+              input={{ startAdornment: <InputAdornment position="start">₱</InputAdornment> }}
             />
           </Box>
 

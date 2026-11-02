@@ -19,6 +19,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { useAuth } from '../../auth/Auth';
+import { money } from '../../dataqueries/Booking';
 
 import UserManagement from './UserManagement';
 import HostManagement from './HostManagement';
@@ -67,7 +68,7 @@ function Overview({ users, properties, reservations }) {
         </Paper>
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
           <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Total Volume</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#16A34A' }}>${totalEarnings.toLocaleString()}</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#16A34A' }}>{money(totalEarnings)}</Typography>
         </Paper>
       </Box>
     </Box>

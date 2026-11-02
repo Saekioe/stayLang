@@ -6,6 +6,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import { collection, deleteDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
+import { money } from '../../dataqueries/Booking';
 
 export default function PropertyManagement() {
   const [properties, setProperties] = useState([]);
@@ -68,7 +69,7 @@ export default function PropertyManagement() {
                   <TableRow key={p.id}>
                     <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
                     <TableCell>{p.city}</TableCell>
-                    <TableCell>${p.pricePerNight}</TableCell>
+                    <TableCell>{money(p.pricePerNight)}</TableCell>
                     <TableCell>
                       <Chip size="small" label={visible ? 'Visible' : 'Hidden'} color={visible ? 'primary' : 'default'} />
                     </TableCell>

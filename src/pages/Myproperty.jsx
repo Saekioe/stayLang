@@ -17,6 +17,7 @@ import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
+import { hostPayout, money } from '../dataqueries/Booking';
 
 const statusStyle = {
   pending: { bgcolor: '#FBF1C0', color: '#6B5200' },
@@ -26,7 +27,6 @@ const statusStyle = {
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const capitalize = (s = '') => s.charAt(0).toUpperCase() + s.slice(1);
-const money = (n) => `$${Math.round(n).toLocaleString()}`;
 
 const fmt = (d) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -60,7 +60,7 @@ function computeStats(properties, reservations, reviews) {
   const pending = reservations.filter((r) => r.status === 'pending');
   const declined = reservations.filter((r) => r.status === 'declined');
 
-  const earnings = confirmed.reduce((sum, r) => sum + (r.total ?? 0), 0);
+  const earnings = confirmed.reduce((sum, r) => sum + hostPayout(r), 0);
   const nights = confirmed.reduce((sum, r) => sum + (r.nights ?? 0), 0);
   const decided = confirmed.length + declined.length;
   const acceptance = decided ? Math.round((confirmed.length / decided) * 100) : null;
@@ -77,7 +77,7 @@ function computeStats(properties, reservations, reviews) {
   });
   confirmed.forEach((r) => {
     const month = months.find((m) => m.key === r.checkIn?.slice(0, 7));
-    if (month) month.total += r.total ?? 0;
+    if (month) month.total += hostPayout(r);
   });
 
   const upcoming = confirmed
@@ -98,7 +98,7 @@ function computeStats(properties, reservations, reviews) {
       p,
       requests: mine.length,
       confirmed: conf.length,
-      earnings: conf.reduce((sum, r) => sum + (r.total ?? 0), 0),
+      earnings: conf.reduce((sum, r) => sum + hostPayout(r), 0),
       occupancy: Math.min(100, Math.round((bookedNights / 30) * 100)),
       ratingCount: mineReviews.length,
       rating: mineReviews.length ? mineReviews.reduce((sum, rv) => sum + rv.rating, 0) / mineReviews.length : null,
@@ -331,7 +331,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
         }}
       >
         <Typography sx={{ fontWeight: 700 }}>
-          ${p.pricePerNight}
+          {money(p.pricePerNight)}
           <Box component="span" sx={{ fontWeight: 400, color: '#7A7070' }}> per night</Box>
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -385,7 +385,7 @@ function RequestRow({ r, review, onStatus, onReply }) {
             {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.nights ?? 0, 'night')}
           </Typography>
           <Typography variant="body2" sx={{ color: '#7A7070' }}>
-            {plural(r.guests ?? 1, 'guest')}, ${r.total} total{placed ? `, requested ${placed}` : ''}
+            {plural(r.guests ?? 1, 'guest')}, {money(r.total)} total{placed ? `, requested ${placed}` : ''}
           </Typography>
         </Box>
 

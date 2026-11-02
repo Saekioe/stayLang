@@ -10,6 +10,7 @@ import {
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
+import { money } from '../dataqueries/Booking';
 
 // Set to true to let guests review only after their check-out date has passed.
 const ONLY_AFTER_CHECKOUT = true;
@@ -181,7 +182,7 @@ export default function MyBookings() {
                         {fmt(b.checkIn)} to {fmt(b.checkOut)}, {plural(b.nights ?? 0, 'night')}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#7A7070' }}>
-                        {plural(b.guests ?? 1, 'guest')}, ${b.total} total
+                        {plural(b.guests ?? 1, 'guest')}, {money(b.total)} total
                       </Typography>
                     </Box>
                     <Chip label={info.label} sx={{ fontWeight: 600, ...info.sx }} />

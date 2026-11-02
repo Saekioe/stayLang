@@ -17,6 +17,7 @@ import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import { labelFont } from '../font/Theme';
 import { usePropertyReviews } from '../dataqueries/Data';
+import { computeQuote, money, usePlatformSettings } from '../dataqueries/Booking';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -49,7 +50,13 @@ function Details({ place, onClose }) {
   const isOwner = Boolean(user) && user.uid === place.ownerId;
   const nights =
     checkIn && checkOut ? Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000) : 0;
-  const total = nights > 0 ? nights * place.pricePerNight : 0;
+  const { serviceFeePercent } = usePlatformSettings();
+  const quote = computeQuote({
+    pricePerNight: place.pricePerNight,
+    nights,
+    cleaningFee: place.cleaningFee,
+    serviceFeePercent,
+  });
 
   // The check-out calendar only allows dates from the day after check-in
   // up to check-in plus the host's maximum stay.
@@ -105,7 +112,13 @@ function Details({ place, onClose }) {
         checkOut,
         nights,
         guests,
-        total,
+        nightlyRate: quote.nightlyRate,
+        subtotal: quote.subtotal,
+        cleaningFee: quote.cleaningFee,
+        serviceFeePercent: quote.serviceFeePercent,
+        serviceFee: quote.serviceFee,
+        total: quote.total,
+        currency: 'PHP',
         status: 'pending',
         createdAt: serverTimestamp(),
       });
@@ -255,7 +268,7 @@ function Details({ place, onClose }) {
         <Box>
           <Box sx={{ bgcolor: '#fff', borderRadius: '12px', p: 2.5, border: '1px solid #E0E0E0' }}>
             <Typography component="div" sx={{ fontSize: '1.5rem', fontWeight: 700 }}>
-              ${place.pricePerNight}
+              {money(place.pricePerNight)}
               <Typography component="span" variant="body2" sx={{ fontWeight: 400 }}> /night</Typography>
             </Typography>
             {place.maxStay ? (
@@ -311,12 +324,24 @@ function Details({ place, onClose }) {
             {nights > 0 && (
               <Box sx={{ mt: 2, fontSize: '0.875rem' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>${place.pricePerNight} × {plural(nights, 'night')}</span>
-                  <span>${total}</span>
+                  <span>{money(quote.nightlyRate)} × {plural(nights, 'night')}</span>
+                  <span>{money(quote.subtotal)}</span>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mt: 0.5 }}>
+                {quote.cleaningFee > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                    <span>Cleaning fee</span>
+                    <span>{money(quote.cleaningFee)}</span>
+                  </Box>
+                )}
+                {quote.serviceFee > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                    <span>Service fee ({quote.serviceFeePercent}%)</span>
+                    <span>{money(quote.serviceFee)}</span>
+                  </Box>
+                )}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mt: 1, pt: 1, borderTop: '1px solid #E0E0E0' }}>
                   <span>Total</span>
-                  <span>${total}</span>
+                  <span>{money(quote.total)}</span>
                 </Box>
               </Box>
             )}

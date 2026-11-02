@@ -51,6 +51,7 @@ export function toPlace(snap) {
     rating: d.rating ?? null,
     pricePerNight: d.pricePerNight,
     maxStay: d.maxStay ?? null,
+    cleaningFee: d.cleaningFee ?? 0,
     capacity: d.capacity ?? 1,
     bedrooms: d.bedrooms ?? 0,
     beds: d.beds ?? 1,
