@@ -12,7 +12,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import { labelFont } from '../font/Theme';
@@ -100,6 +100,28 @@ function Details({ place, onClose }) {
     }
     setBusy(true);
     try {
+      const mine = await getDocs(
+        query(
+          collection(db, 'reservations'),
+          where('guestId', '==', user.uid),
+          where('propertyId', '==', place.id)
+        )
+      );
+      const clash = mine.docs.some((d) => {
+        const r = d.data();
+        return (
+          (r.status === 'pending' || r.status === 'confirmed') &&
+          r.checkIn < checkOut &&   // existing starts before the new one ends
+          r.checkOut > checkIn      // existing ends after the new one starts
+        );
+      });
+      if (clash) {
+        setNotice({
+          severity: 'error',
+          text: 'You already have a request for this place that overlaps these dates.',
+        });
+        return;
+      }
       await addDoc(collection(db, 'reservations'), {
         propertyId: place.id,
         propertyTitle: place.name,

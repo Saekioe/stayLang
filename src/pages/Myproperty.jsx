@@ -609,6 +609,20 @@ export default function MyProperty() {
   // Confirm or decline a request, and leave a message in the guest's inbox.
   const setStatus = async (r, status) => {
     try {
+      if (status === 'confirmed') {
+        const conflict = reservations.some(
+          (o) =>
+            o.id !== r.id &&
+            o.propertyId === r.propertyId &&
+            o.status === 'confirmed' &&
+            o.checkIn < r.checkOut &&
+            o.checkOut > r.checkIn
+        );
+        if (conflict) {
+          setError('These dates overlap with an already confirmed booking.');
+          return;
+        }
+      }
       const batch = writeBatch(db);
       batch.update(doc(db, 'reservations', r.id), { status });
       batch.set(doc(collection(db, 'notifications')), {
