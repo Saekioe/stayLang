@@ -2,10 +2,15 @@ import { useState } from 'react';
 import {
   Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert,
 } from '@mui/material';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
+import { useAuth } from '../auth/Auth';
 
-export default function EditProfile({ open, onClose, user, profile }) {
+// The form lives inside the Dialog, so MUI mounts it fresh every time the dialog
+// opens. That makes the fields start from the profile that is loaded right now,
+// instead of from whatever the profile was when the navbar first rendered.
+function ProfileForm({ onClose, user, profile }) {
+  const { setProfile } = useAuth();
   const [firstName, setFirstName] = useState(profile?.firstName || '');
   const [lastName, setLastName] = useState(profile?.lastName || '');
   const [phone, setPhone] = useState(profile?.phone || '');
@@ -15,20 +20,24 @@ export default function EditProfile({ open, onClose, user, profile }) {
 
   const handleSaveProfile = async () => {
     if (!user) return;
+    if (!firstName.trim() || !lastName.trim()) {
+      setErrorMsg('Enter your first and last name.');
+      return;
+    }
     setSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
+    const changes = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+    };
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone.trim(),
-      });
+      // merge: true keeps username, birthday, email, etc. untouched.
+      await setDoc(doc(db, 'users', user.uid), changes, { merge: true });
+      setProfile((prev) => ({ ...(prev ?? {}), ...changes }));
       setSuccessMsg('Profile updated successfully!');
-      setTimeout(() => {
-        onClose();
-      }, 1200);
+      setTimeout(onClose, 1200);
     } catch {
       setErrorMsg('Failed to update profile. Please try again.');
     } finally {
@@ -37,7 +46,7 @@ export default function EditProfile({ open, onClose, user, profile }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { borderRadius: '12px' } }}>
+    <>
       <DialogTitle sx={{ fontWeight: 700, color: 'black' }}>Edit Account Information</DialogTitle>
       <DialogContent dividers>
         {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
@@ -58,13 +67,7 @@ export default function EditProfile({ open, onClose, user, profile }) {
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
           />
-          <TextField
-            label="Email"
-            size="small"
-            fullWidth
-            disabled
-            value={user?.email || ''}
-          />
+          <TextField label="Email" size="small" fullWidth disabled value={user?.email || ''} />
           <TextField
             label="Phone"
             size="small"
@@ -78,15 +81,18 @@ export default function EditProfile({ open, onClose, user, profile }) {
         <Button onClick={onClose} color="inherit" disabled={saving}>
           Cancel
         </Button>
-        <Button
-          onClick={handleSaveProfile}
-          variant="contained"
-          disabled={saving}
-          sx={{ borderRadius: '8px' }}
-        >
+        <Button onClick={handleSaveProfile} variant="contained" disabled={saving} sx={{ borderRadius: '8px' }}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </DialogActions>
+    </>
+  );
+}
+
+export default function EditProfile({ open, onClose, user, profile }) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { borderRadius: '12px' } }}>
+      <ProfileForm onClose={onClose} user={user} profile={profile} />
     </Dialog>
   );
 }

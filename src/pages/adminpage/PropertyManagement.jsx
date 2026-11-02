@@ -19,10 +19,13 @@ export default function PropertyManagement() {
     return unsub;
   }, []);
 
-  const handleUpdateStatus = async (id, updates) => {
+  // Guests only see listings where `published` is true (see usePlaces in Data.js),
+  // so hiding or publishing a listing must change that same field.
+  const handleToggleVisibility = async (p) => {
+    const next = p.published !== true;
     try {
-      await updateDoc(doc(db, 'properties', id), updates);
-      setSuccess('Record updated successfully.');
+      await updateDoc(doc(db, 'properties', p.id), { published: next });
+      setSuccess(next ? 'Listing is now visible to guests.' : 'Listing is now hidden from guests.');
     } catch {
       setError('Could not complete administrative action.');
     }
@@ -59,24 +62,27 @@ export default function PropertyManagement() {
             {properties.length === 0 ? (
               <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}>No properties found.</TableCell></TableRow>
             ) : (
-              properties.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
-                  <TableCell>{p.city}</TableCell>
-                  <TableCell>${p.pricePerNight}</TableCell>
-                  <TableCell>
-                    <Chip size="small" label={p.hidden ? 'Hidden' : 'Visible'} color={p.hidden ? 'default' : 'primary'} />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button size="small" onClick={() => handleUpdateStatus(p.id, { hidden: !p.hidden })}>
-                      {p.hidden ? 'Publish' : 'Hide'}
-                    </Button>
-                    <IconButton color="error" size="small" onClick={() => handleDelete(p.id)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+              properties.map((p) => {
+                const visible = p.published === true;
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
+                    <TableCell>{p.city}</TableCell>
+                    <TableCell>${p.pricePerNight}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={visible ? 'Visible' : 'Hidden'} color={visible ? 'primary' : 'default'} />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" onClick={() => handleToggleVisibility(p)}>
+                        {visible ? 'Hide' : 'Publish'}
+                      </Button>
+                      <IconButton color="error" size="small" aria-label={`Delete ${p.title}`} onClick={() => handleDelete(p.id)}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

@@ -192,7 +192,6 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       maxStay: toNum(form.maxStay, 30),
       amenities: form.amenities,
       images: form.images,
-      published: true, // listings are live as soon as they are saved
       hostName: form.hostName.trim(),
       hostBio: form.hostBio.trim(),
       hostEmail: form.hostEmail.trim(),
@@ -206,6 +205,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       } else {
         await addDoc(collection(db, 'properties'), {
           ...data,
+          published: true, // new listings go live; editing never overrides an admin hide
           ownerId: user.uid,
           createdAt: serverTimestamp(),
         });

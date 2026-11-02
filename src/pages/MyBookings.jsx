@@ -12,7 +12,7 @@ import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 
 // Set to true to let guests review only after their check-out date has passed.
-const ONLY_AFTER_CHECKOUT = false;
+const ONLY_AFTER_CHECKOUT = true;
 
 const statusInfo = {
   pending: { label: 'Waiting for the host', sx: { bgcolor: '#FBF1C0', color: '#6B5200' } },

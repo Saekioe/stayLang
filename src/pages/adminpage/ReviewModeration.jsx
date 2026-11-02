@@ -14,18 +14,20 @@ export default function ReviewModeration() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'reviews'), (snap) => {
-      setReviews(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }, () => {});
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      setReviews(list);
+    }, () => setError('Failed to stream reviews.'));
     return unsub;
   }, []);
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this record permanently?')) return;
+    if (!window.confirm('Delete this review permanently?')) return;
     try {
       await deleteDoc(doc(db, 'reviews', id));
-      setSuccess('Record removed successfully.');
+      setSuccess('Review removed successfully.');
     } catch {
-      setError('Could not delete record.');
+      setError('Could not delete review.');
     }
   };
 
@@ -40,22 +42,26 @@ export default function ReviewModeration() {
           <TableHead sx={{ bgcolor: '#edf2f7' }}>
             <TableRow>
               <TableCell>Author</TableCell>
+              <TableCell>Property</TableCell>
               <TableCell>Rating</TableCell>
               <TableCell>Comment</TableCell>
+              <TableCell>Host reply</TableCell>
               <TableCell align="right">Moderate</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {reviews.length === 0 ? (
-              <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3 }}>No reviews flagged or submitted.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}>No reviews submitted yet.</TableCell></TableRow>
             ) : (
               reviews.map((rev) => (
                 <TableRow key={rev.id}>
-                  <TableCell sx={{ fontWeight: 600 }}>{rev.userName || 'Anonymous'}</TableCell>
-                  <TableCell><Rating value={rev.rating || 5} readOnly size="small" /></TableCell>
-                  <TableCell>{rev.comment}</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>{rev.guestName || 'Anonymous'}</TableCell>
+                  <TableCell>{rev.propertyTitle || '-'}</TableCell>
+                  <TableCell><Rating value={rev.rating ?? 0} readOnly size="small" /></TableCell>
+                  <TableCell sx={{ maxWidth: 320 }}>{rev.text || <em>No comment</em>}</TableCell>
+                  <TableCell sx={{ maxWidth: 240 }}>{rev.hostReply || '-'}</TableCell>
                   <TableCell align="right">
-                    <IconButton color="error" size="small" onClick={() => handleDelete(rev.id)}>
+                    <IconButton color="error" size="small" aria-label="Delete review" onClick={() => handleDelete(rev.id)}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
