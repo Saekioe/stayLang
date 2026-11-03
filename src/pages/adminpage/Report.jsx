@@ -36,7 +36,7 @@ export default function Report() {
           <Box>
             <Typography variant="caption" color="text.secondary">Cancelled/Declined</Typography>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              {reservations.filter((r) => r.status === 'declined').length}
+              {reservations.filter((r) => r.status === 'declined' || r.status === 'cancelled').length}
             </Typography>
           </Box>
         </Box>
