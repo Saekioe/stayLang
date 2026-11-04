@@ -1,25 +1,29 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert, Button, Chip, IconButton, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Typography,
+  Alert, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { collection, deleteDoc, doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { money } from '../../dataqueries/Booking';
-
+import {
+  DeleteButton, PageHeader, Panel, StatusPill, TextAction, colors, tableSx,
+} from './adminUi';
+ 
 export default function PropertyManagement() {
   const [properties, setProperties] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
+ 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'properties'), (snap) => {
       setProperties(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => setError('Failed to stream properties.'));
     return unsub;
   }, []);
-
+ 
   // Guests only see listings where `published` is true (see usePlaces in Data.js),
   // so hiding or publishing a listing must change that same field.
   const handleToggleVisibility = async (p) => {
@@ -31,7 +35,7 @@ export default function PropertyManagement() {
       setError('Could not complete administrative action.');
     }
   };
-
+ 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this record permanently?')) return;
     try {
@@ -41,53 +45,79 @@ export default function PropertyManagement() {
       setError('Could not delete record.');
     }
   };
-
+ 
   return (
     <>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
-
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>Property Management</Typography>
-      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
-        <Table size="small">
-          <TableHead sx={{ bgcolor: '#edf2f7' }}>
-            <TableRow>
-              <TableCell>Property</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Nightly Rate</TableCell>
-              <TableCell>Visibility</TableCell>
-              <TableCell align="right">Controls</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {properties.length === 0 ? (
-              <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}>No properties found.</TableCell></TableRow>
-            ) : (
-              properties.map((p) => {
-                const visible = p.published === true;
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
-                    <TableCell>{p.city}</TableCell>
-                    <TableCell>{money(p.pricePerNight)}</TableCell>
-                    <TableCell>
-                      <Chip size="small" label={visible ? 'Visible' : 'Hidden'} color={visible ? 'primary' : 'default'} />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button size="small" onClick={() => handleToggleVisibility(p)}>
-                        {visible ? 'Hide' : 'Publish'}
-                      </Button>
-                      <IconButton color="error" size="small" aria-label={`Delete ${p.title}`} onClick={() => handleDelete(p.id)}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+ 
+      <PageHeader
+        title="Property Management"
+        subtitle="Manage property visibility, nightly rates and published listings."
+      />
+ 
+      <Panel
+        title="All properties"
+        subtitle="Control which properties are visible on StayLang"
+        footer={`Showing all ${properties.length} properties · Nightly rates in PHP`}
+      >
+        <TableContainer>
+          <Table sx={tableSx}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Property</TableCell>
+                <TableCell>Location</TableCell>
+                <TableCell>Nightly rate</TableCell>
+                <TableCell>Visibility</TableCell>
+                <TableCell>Controls</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {properties.length === 0 ? (
+                <TableRow><TableCell colSpan={5} align="center">No properties found.</TableCell></TableRow>
+              ) : (
+                properties.map((p) => {
+                  const visible = p.published === true;
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Box
+                            sx={{
+                              width: 32, height: 32, borderRadius: '8px', bgcolor: '#F2F5F7',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            <HomeOutlinedIcon sx={{ fontSize: 18, color: '#6B7280' }} />
+                          </Box>
+                          <Typography sx={{ fontSize: 14 }}>{p.title}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ color: `${colors.link} !important` }}>{p.city}</TableCell>
+                      <TableCell>{money(p.pricePerNight)}</TableCell>
+                      <TableCell>
+                        <StatusPill label={visible ? 'Visible' : 'Hidden'} variant={visible ? 'visible' : 'hidden'} />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <TextAction
+                            width={96}
+                            Icon={visible ? VisibilityOffOutlinedIcon : VisibilityOutlinedIcon}
+                            onClick={() => handleToggleVisibility(p)}
+                          >
+                            {visible ? 'Hide' : 'Publish'}
+                          </TextAction>
+                          <DeleteButton label={`Delete ${p.title}`} onClick={() => handleDelete(p.id)} />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Panel>
     </>
   );
 }

@@ -72,13 +72,13 @@ export default function NavigationBar() {
               component="img"
               src={logo}
               alt="StayLang Logo"
-              sx={{ height: 40, ml: 1.25 }}
+              sx={{ height: 35, ml: 1.25 }}
             />
             <Typography
               variant="h6"
               component={RouterLink}
               to="/"
-              sx={{ fontWeight: 'bold', color: '#0f4a5f', textDecoration: 'none', fontSize: '1.1rem' }}
+              sx={{ fontWeight: 'bold', color: '#0f4a5f', textDecoration: 'none', fontSize: '1.1rem', ml: 1 }}
             >
               StayLang
             </Typography>

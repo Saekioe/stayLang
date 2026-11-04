@@ -1,26 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Paper,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
+import NorthEastOutlinedIcon from '@mui/icons-material/NorthEastOutlined';
 import { collection, doc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
-
-const CHIP = {
-  pending: { label: 'Pending Review', color: 'warning' },
-  approved: { label: 'Approved', color: 'success' },
-  rejected: { label: 'Rejected', color: 'error' },
+import { PageHeader, Panel, StatusPill, colors, tableSx } from './adminUi';
+ 
+const STATUS = {
+  pending: { label: 'Pending', variant: 'pending' },
+  approved: { label: 'Approved', variant: 'approved' },
+  rejected: { label: 'Rejected', variant: 'rejected' },
 };
-
+ 
 function Detail({ label, children }) {
   return (
     <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>{label}</Typography>
-      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{children || 'Not provided'}</Typography>
+      <Typography sx={{ fontSize: 12, color: colors.muted, fontWeight: 700 }}>{label}</Typography>
+      <Typography sx={{ fontSize: 14, color: '#000', whiteSpace: 'pre-wrap' }}>{children || 'Not provided'}</Typography>
     </Box>
   );
 }
-
+ 
 export default function HostManagement() {
   const [applications, setApplications] = useState([]);
   const [properties, setProperties] = useState([]);
@@ -30,22 +32,22 @@ export default function HostManagement() {
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState(false);
   const [busy, setBusy] = useState(false);
-
+ 
   useEffect(() => {
     const unsubApps = onSnapshot(collection(db, 'hostApplications'), (snap) => {
       setApplications(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => setError('Failed to stream host applications.'));
-
+ 
     const unsubProps = onSnapshot(collection(db, 'properties'), (snap) => {
       setProperties(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => setError('Failed to stream properties.'));
-
+ 
     return () => {
       unsubApps();
       unsubProps();
     };
   }, []);
-
+ 
   // Pending first, then newest.
   const rows = useMemo(
     () =>
@@ -56,13 +58,13 @@ export default function HostManagement() {
       ),
     [applications]
   );
-
+ 
   const openReview = (app) => {
     setSelected(app);
     setNote(app.reviewNote ?? '');
     setNoteError(false);
   };
-
+ 
   const decide = async (app, status) => {
     const approved = status === 'approved';
     if (!approved && !note.trim()) return setNoteError(true);
@@ -90,56 +92,79 @@ export default function HostManagement() {
       setBusy(false);
     }
   };
-
+ 
   return (
     <>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
-
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>Host Approvals & Status</Typography>
-      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #e2e8f0' }}>
-        <Table size="small">
-          <TableHead sx={{ bgcolor: '#edf2f7' }}>
-            <TableRow>
-              <TableCell>Applicant</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Planned property</TableCell>
-              <TableCell>Listings</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Review</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 3 }}>No host applications yet.</TableCell></TableRow>
-            ) : (
-              rows.map((a) => {
-                const count = properties.filter((p) => p.ownerId === a.id).length;
-                const chip = CHIP[a.status] ?? CHIP.pending;
-                return (
-                  <TableRow key={a.id}>
-                    <TableCell sx={{ fontWeight: 600 }}>{a.fullName}</TableCell>
-                    <TableCell>{a.email}</TableCell>
-                    <TableCell>{[a.propertyType, a.propertyCity].filter(Boolean).join(', ')}</TableCell>
-                    <TableCell>{count}</TableCell>
-                    <TableCell><Chip size="small" label={chip.label} color={chip.color} /></TableCell>
-                    <TableCell align="right">
-                      <Button size="small" onClick={() => openReview(a)}>
-                        {a.status === 'pending' ? 'Review' : 'View'}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Dialog open={Boolean(selected)} onClose={() => !busy && setSelected(null)} fullWidth maxWidth="md">
+ 
+      <PageHeader title="Host Management" subtitle="Review host applications, proposed properties and approval status." />
+ 
+      <Panel
+        title="Host Approvals & Status"
+        subtitle="Applicants and their proposed listings"
+        footer={`Showing all ${rows.length} host applicant${rows.length === 1 ? '' : 's'}`}
+      >
+        <TableContainer>
+          <Table sx={{ ...tableSx, '& .MuiTableBody-root .MuiTableRow-root': { height: 79 } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Applicant</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Planned property</TableCell>
+                <TableCell>Listings</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Review</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow><TableCell colSpan={6} align="center">No host applications yet.</TableCell></TableRow>
+              ) : (
+                rows.map((a) => {
+                  const count = properties.filter((p) => p.ownerId === a.id).length;
+                  const status = STATUS[a.status] ?? STATUS.pending;
+                  return (
+                    <TableRow key={a.id}>
+                      <TableCell>{a.fullName}</TableCell>
+                      <TableCell sx={{ color: `${colors.link} !important` }}>{a.email}</TableCell>
+                      <TableCell>{[a.propertyType, a.propertyCity].filter(Boolean).join(', ')}</TableCell>
+                      <TableCell>{count}</TableCell>
+                      <TableCell><StatusPill label={status.label} variant={status.variant} /></TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => openReview(a)}
+                          startIcon={<NorthEastOutlinedIcon sx={{ fontSize: '16px !important' }} />}
+                          sx={{
+                            color: colors.title, borderColor: colors.line, borderRadius: '8px',
+                            fontWeight: 700, fontSize: 14, px: 1.75, bgcolor: '#fff',
+                            '&:hover': { borderColor: colors.primary, bgcolor: '#fff' },
+                          }}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Panel>
+ 
+      <Dialog
+        open={Boolean(selected)}
+        onClose={() => !busy && setSelected(null)}
+        fullWidth
+        maxWidth="md"
+        slotProps={{ paper: { sx: { color: '#000' } } }}
+      >
         {selected && (
           <>
-            <DialogTitle sx={{ color: '#0F4A5F', fontWeight: 600 }}>Host application: {selected.fullName}</DialogTitle>
+            <DialogTitle sx={{ color: '#000', fontWeight: 700 }}>Host application: {selected.fullName}</DialogTitle>
             <DialogContent dividers>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, columnGap: 3 }}>
                 <Box>
@@ -148,7 +173,7 @@ export default function HostManagement() {
                   <Detail label="Home address">{selected.address}</Detail>
                   <Detail label="Government ID type">{selected.idType}</Detail>
                   {selected.idPhoto && (
-                    <Box component="img" src={selected.idPhoto} alt="Government ID" sx={{ maxWidth: '100%', maxHeight: 220, borderRadius: 2, border: '1px solid #e2e8f0' }} />
+                    <Box component="img" src={selected.idPhoto} alt="Government ID" sx={{ maxWidth: '100%', maxHeight: 220, borderRadius: 2, border: `1px solid ${colors.line}` }} />
                   )}
                 </Box>
                 <Box>
@@ -158,7 +183,7 @@ export default function HostManagement() {
                   </Detail>
                   <Detail label="About the applicant">{selected.about}</Detail>
                   {selected.proofPhoto && (
-                    <Box component="img" src={selected.proofPhoto} alt="Proof of ownership or permission" sx={{ maxWidth: '100%', maxHeight: 220, borderRadius: 2, border: '1px solid #e2e8f0' }} />
+                    <Box component="img" src={selected.proofPhoto} alt="Proof of ownership or permission" sx={{ maxWidth: '100%', maxHeight: 220, borderRadius: 2, border: `1px solid ${colors.line}` }} />
                   )}
                 </Box>
               </Box>
