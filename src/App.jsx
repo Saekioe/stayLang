@@ -14,6 +14,7 @@ import FrontPage from './components/FrontPage';
 import About from './components/About';
 import Places from './components/Places';
 import AdminDashboard from './pages/adminpage/AdminDashboard';
+import Notifications from './pages/Notifications';
 
 function Home() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/places" element={<FindPlaces />} />
             <Route path="/my-property" element={<MyProperty />} />
             <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             {/* Any address that is not listed above goes back to the home page */}

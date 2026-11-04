@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, Navigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  Paper, Rating, TextField, Typography,
+  Divider, Paper, Rating, Tab, Tabs, TextField, Typography,
 } from '@mui/material';
 import {
   collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where,
@@ -24,8 +24,56 @@ const statusInfo = {
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
 const fmt = (d) =>
-  new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  d
+    ? new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+const fmtStamp = (ts) =>
+  ts?.toDate
+    ? ts.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+const surfaceSx = {
+  bgcolor: '#ffffff',
+  border: '1px solid #E6E3E3',
+  borderRadius: '16px',
+  overflow: 'hidden',
+};
+
+const TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'past', label: 'Past' },
+  { key: 'closed', label: 'Cancelled or declined' },
+];
+
+// Which tab a reservation belongs to.
+const tabOf = (b) => {
+  const s = statusOf(b);
+  if (s === 'completed') return 'past';
+  if (s === 'cancelled' || s === 'declined') return 'closed';
+  return 'upcoming'; // pending, or confirmed and not finished yet
+};
+
+function Line({ label, value, bold }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.5 }}>
+      <Typography variant="body2" sx={{ color: '#7A7070' }}>{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: bold ? 700 : 500, textAlign: 'right' }}>{value}</Typography>
+    </Box>
+  );
+}
+
+function SummaryCard({ label, value }) {
+  return (
+    <Paper elevation={0} sx={{ ...surfaceSx, p: 2 }}>
+      <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>{label}</Typography>
+      <Typography sx={{ fontSize: '1.75rem', fontWeight: 700, lineHeight: 1.2 }}>{value}</Typography>
+    </Paper>
+  );
+}
 
 export default function MyBookings() {
   const { user, profile, loading } = useAuth();
@@ -35,6 +83,10 @@ export default function MyBookings() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [cancellingId, setCancellingId] = useState('');
+
+  // history filter and details dialog
+  const [tab, setTab] = useState('all');
+  const [selected, setSelected] = useState(null);
 
   // review dialog
   const [reviewing, setReviewing] = useState(null);
@@ -48,7 +100,8 @@ export default function MyBookings() {
       query(collection(db, 'reservations'), where('guestId', '==', uid)),
       (snap) => {
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        list.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        // Newest check-in first, so the history reads from most recent to oldest.
+        list.sort((a, b) => (b.checkIn ?? '').localeCompare(a.checkIn ?? ''));
         setBookings(list);
         setReady(true);
       },
@@ -69,10 +122,23 @@ export default function MyBookings() {
     };
   }, [uid]);
 
+  const counts = useMemo(() => {
+    const c = { all: bookings.length, upcoming: 0, past: 0, closed: 0 };
+    bookings.forEach((b) => { c[tabOf(b)] += 1; });
+    return c;
+  }, [bookings]);
+
+  const spent = useMemo(
+    () => bookings.filter((b) => statusOf(b) === 'completed').reduce((sum, b) => sum + (b.total ?? 0), 0),
+    [bookings]
+  );
+
   if (loading) {
     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
   }
   if (!user) return <Navigate to="/login" replace />;
+
+  const shown = tab === 'all' ? bookings : bookings.filter((b) => tabOf(b) === tab);
 
   // A guest can cancel a pending or confirmed booking until the day of check-in.
   const canCancel = (b) => (b.status === 'pending' || b.status === 'confirmed') && b.checkIn > todayISO();
@@ -151,32 +217,69 @@ export default function MyBookings() {
     }
   };
 
+  // Details dialog: use the live copy so it updates if the host changes the status while it is open.
+  const current = selected ? bookings.find((b) => b.id === selected.id) ?? selected : null;
+  const currentInfo = current ? statusInfo[statusOf(current)] ?? statusInfo.pending : null;
+  const cleaning = current?.cleaningFee ?? 0;
+  const service = current?.serviceFee ?? 0;
+  const roomTotal = current ? (current.total ?? 0) - cleaning - service : 0;
+  const perNight = current?.nights ? roomTotal / current.nights : 0;
+
   return (
     <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
       <NavigationBar />
       <Box sx={{ maxWidth: 900, mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12, textAlign: 'left' }}>
         <Typography component="h1" sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1 }}>
-          My bookings
+          My Reservations
         </Typography>
         <Typography sx={{ color: '#7A7070', mt: 1, mb: 3 }}>
-          Your booking requests, what the host decided, and your reviews.
+          View reservation history and details, and leave reviews for your stays.
         </Typography>
 
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-        <Paper elevation={0} sx={{ bgcolor: '#fff', border: '1px solid #E6E3E3', borderRadius: '16px', overflow: 'hidden' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+          <SummaryCard label="All reservations" value={counts.all} />
+          <SummaryCard label="Upcoming" value={counts.upcoming} />
+          <SummaryCard label="Past stays" value={counts.past} />
+          <SummaryCard label="Total spent" value={money(spent)} />
+        </Box>
+
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            mb: 2,
+            borderBottom: '1px solid #E6E3E3',
+            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '1rem' },
+          }}
+        >
+          {TABS.map((t) => (
+            <Tab key={t.key} value={t.key} label={`${t.label} (${counts[t.key]})`} />
+          ))}
+        </Tabs>
+
+        <Paper elevation={0} sx={surfaceSx}>
           {!ready ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress /></Box>
-          ) : bookings.length === 0 ? (
+          ) : shown.length === 0 ? (
             <Box sx={{ px: 3, py: 7, textAlign: 'center' }}>
-              <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>No bookings yet</Typography>
-              <Typography sx={{ color: '#7A7070', maxWidth: 420, mx: 'auto', mb: 3 }}>
-                When you request a place, it will show up here with its status.
+              <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>
+                {bookings.length === 0 ? 'No reservations yet' : 'Nothing in this list'}
               </Typography>
-              <Button variant="contained" component={RouterLink} to="/places">Find places</Button>
+              <Typography sx={{ color: '#7A7070', maxWidth: 420, mx: 'auto', mb: 3 }}>
+                {bookings.length === 0
+                  ? 'When you request a place, it will show up here with its status.'
+                  : 'Try another tab to see your other reservations.'}
+              </Typography>
+              {bookings.length === 0 && (
+                <Button variant="contained" component={RouterLink} to="/places">Find places</Button>
+              )}
             </Box>
           ) : (
-            bookings.map((b) => {
+            shown.map((b) => {
               const info = statusInfo[statusOf(b)] ?? statusInfo.pending;
               const review = reviews[b.id];
               return (
@@ -198,24 +301,22 @@ export default function MyBookings() {
                       <Typography variant="body2" sx={{ color: '#7A7070' }}>
                         {plural(b.guests ?? 1, 'guest')}, {money(b.total)} total
                       </Typography>
-                      {b.serviceFee != null && (
-                        <Typography variant="caption" sx={{ color: '#7A7070', display: 'block' }}>
-                          Includes {money(b.cleaningFee ?? 0)} cleaning fee and {money(b.serviceFee)} service fee
-                        </Typography>
-                      )}
                       {b.status === 'cancelled' && (
                         <Typography variant="body2" sx={{ color: '#8A2E26', mt: 0.5 }}>
                           Cancelled by {b.cancelledBy === 'host' ? 'the host' : 'you'}.
                         </Typography>
                       )}
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip label={info.label} sx={{ fontWeight: 600, ...info.sx }} />
+                      <Button size="small" variant="outlined" onClick={() => setSelected(b)}>
+                        View details
+                      </Button>
                       {canCancel(b) && (
                         <Button size="small" color="inherit" disabled={cancellingId === b.id} onClick={() => cancelBooking(b)}>
                           {cancellingId === b.id ? 'Cancelling…' : 'Cancel booking'}
                         </Button>
                       )}
-                      <Chip label={info.label} sx={{ fontWeight: 600, ...info.sx }} />
                     </Box>
                   </Box>
 
@@ -227,6 +328,11 @@ export default function MyBookings() {
                             <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>Your review</Typography>
                             <Rating value={review.rating} readOnly size="small" />
                             {review.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{review.text}</Typography>}
+                            {review.hostReply && (
+                              <Typography variant="body2" sx={{ mt: 0.5, color: '#2F5E70' }}>
+                                Host reply: {review.hostReply}
+                              </Typography>
+                            )}
                           </Box>
                           <Button size="small" onClick={() => openReview(b)}>Edit review</Button>
                         </Box>
@@ -251,6 +357,63 @@ export default function MyBookings() {
         </Paper>
       </Box>
 
+      {/* Reservation details */}
+      <Dialog open={Boolean(current)} onClose={() => setSelected(null)} fullWidth maxWidth="sm" aria-labelledby="res-title">
+        {current && (
+          <>
+            <DialogTitle id="res-title" sx={{ textAlign: 'left' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                <span>Reservation details</span>
+                <Chip label={currentInfo.label} sx={{ fontWeight: 600, ...currentInfo.sx }} />
+              </Box>
+            </DialogTitle>
+            <DialogContent sx={{ textAlign: 'left' }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', mb: 1 }}>{current.propertyTitle}</Typography>
+
+              <Line label="Check-in" value={fmt(current.checkIn)} />
+              <Line label="Check-out" value={fmt(current.checkOut)} />
+              <Line label="Nights" value={current.nights ?? 0} />
+              <Line label="Guests" value={current.guests ?? 1} />
+
+              <Divider sx={{ my: 1.5 }} />
+              <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Price</Typography>
+              <Line
+                label={current.nights ? `${money(perNight)} x ${plural(current.nights, 'night')}` : 'Stay'}
+                value={money(roomTotal)}
+              />
+              {cleaning > 0 && <Line label="Cleaning fee" value={money(cleaning)} />}
+              {service > 0 && <Line label="Service fee" value={money(service)} />}
+              <Line label="Total" value={money(current.total)} bold />
+
+              <Divider sx={{ my: 1.5 }} />
+              <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Booking info</Typography>
+              {fmtStamp(current.createdAt) && <Line label="Requested on" value={fmtStamp(current.createdAt)} />}
+              {current.guestName && <Line label="Booked under" value={current.guestName} />}
+              {current.guestEmail && <Line label="Email" value={current.guestEmail} />}
+              {current.guestPhone && <Line label="Phone" value={current.guestPhone} />}
+              <Line label="Reservation ID" value={current.id} />
+
+              {current.status === 'cancelled' && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  Cancelled by {current.cancelledBy === 'host' ? 'the host' : 'you'}
+                  {fmtStamp(current.cancelledAt) ? ` on ${fmtStamp(current.cancelledAt)}` : ''}.
+                </Alert>
+              )}
+              {current.status === 'declined' && (
+                <Alert severity="info" sx={{ mt: 2 }}>The host declined this request.</Alert>
+              )}
+              {current.status === 'pending' && (
+                <Alert severity="warning" sx={{ mt: 2 }}>Waiting for the host to confirm your request.</Alert>
+              )}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button variant="contained" onClick={() => setSelected(null)}>Close</Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* Review dialog */}
       <Dialog open={Boolean(reviewing)} onClose={closeReview} fullWidth maxWidth="sm" aria-labelledby="review-title">
         <DialogTitle id="review-title" sx={{ textAlign: 'left' }}>
           {reviewing && reviews[reviewing.id] ? 'Edit your review' : 'Write a review'}

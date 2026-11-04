@@ -4,6 +4,7 @@ import {
   AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Badge, Divider,
   Drawer, List, ListItemButton, ListItemText, ListItemIcon, Menu, MenuItem,
 } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -81,6 +82,16 @@ export default function NavigationBar() {
           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
             {loading ? null : user ? (
               <>
+              <IconButton
+                component={RouterLink}
+                to="/notifications"
+                color="inherit"
+                aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+              >
+                <Badge badgeContent={unread} color="error" max={99}>
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
                 <Button
                   color="inherit"
                   onClick={(e) => setAnchorEl(e.currentTarget)}
