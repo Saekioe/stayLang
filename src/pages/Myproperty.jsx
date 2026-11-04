@@ -11,22 +11,29 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import {
-  collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch,
+  collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
-import { hostPayout, money } from '../dataqueries/Booking';
+import AvailabilityCalendar from '../components/AvailabilityCalendar';
+import {
+  PAYMENT_LABELS, STATUS_LABELS, cancelReservation, confirmReservation, declineReservation, hostPayout, money,
+  paymentStatusOf, refundReservation, statusOf, todayISO,
+} from '../dataqueries/Booking';
+import HostApplication from '../components/HostApplication';
+import { useHostApplication } from '../dataqueries/Host';
 
 const statusStyle = {
   pending: { bgcolor: '#FBF1C0', color: '#6B5200' },
   confirmed: { bgcolor: '#E8F1F4', color: '#2F5E70' },
   declined: { bgcolor: '#EFECEC', color: '#7A7070' },
+  cancelled: { bgcolor: '#F8E1DF', color: '#8A2E26' },
+  completed: { bgcolor: '#E3EAF7', color: '#27437A' },
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const capitalize = (s = '') => s.charAt(0).toUpperCase() + s.slice(1);
 
 const fmt = (d) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -347,7 +354,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
   );
 }
 
-function RequestRow({ r, review, onStatus, onReply }) {
+function RequestRow({ r, review, conflict, onStatus, onCancel, onReply }) {
   const pending = r.status === 'pending';
   const placed = r.createdAt?.toDate
     ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -387,13 +394,28 @@ function RequestRow({ r, review, onStatus, onReply }) {
           <Typography variant="body2" sx={{ color: '#7A7070' }}>
             {plural(r.guests ?? 1, 'guest')}, {money(r.total)} total{placed ? `, requested ${placed}` : ''}
           </Typography>
+          {(r.status === 'confirmed' || paymentStatusOf(r) !== 'unpaid') && (
+            <Typography variant="body2" sx={{ fontWeight: 600, color: paymentStatusOf(r) === 'unpaid' ? '#6B5200' : '#2E6B3F' }}>
+              {PAYMENT_LABELS[paymentStatusOf(r)]}
+            </Typography>
+          )}
+          {pending && conflict && (
+            <Typography variant="body2" sx={{ color: '#8A2E26', fontWeight: 600 }}>
+              These dates are already booked by another guest. You can only decline this request.
+            </Typography>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Chip size="small" label={capitalize(r.status)} sx={{ fontWeight: 600, ...statusStyle[r.status] }} />
+          <Chip size="small" label={STATUS_LABELS[statusOf(r)] ?? r.status} sx={{ fontWeight: 600, ...statusStyle[statusOf(r)] }} />
+          {r.status === 'confirmed' && r.checkIn > todayISO() && (
+            <Button size="small" color="inherit" onClick={() => onCancel(r)}>
+              Cancel booking
+            </Button>
+          )}
           {pending && (
             <>
-              <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} onClick={() => onStatus(r, 'confirmed')}>
+              <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} disabled={conflict} onClick={() => onStatus(r, 'confirmed')}>
                 Confirm
               </Button>
               <Button size="small" color="inherit" startIcon={<CloseIcon />} onClick={() => onStatus(r, 'declined')}>
@@ -532,6 +554,7 @@ function ReviewsPanel({ properties, reviews, onReply }) {
 export default function MyProperty() {
   const { user, profile, loading } = useAuth();
   const uid = user?.uid;
+  const { application, status: hostStatus, loading: hostLoading } = useHostApplication(uid);
 
   const [properties, setProperties] = useState([]);
   const [reservations, setReservations] = useState([]);
@@ -544,7 +567,7 @@ export default function MyProperty() {
   const [replying, setReplying] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [replySaving, setReplySaving] = useState(false);
-  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews
+  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews, 4 availability
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -582,52 +605,107 @@ export default function MyProperty() {
     };
   }, [uid]);
 
-  if (loading) {
+  if (loading || hostLoading) {
     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
   }
   if (!user) return <Navigate to="/login" replace />;
 
-  const view = mode === 'list' && autoCreate && ready && properties.length === 0 ? 'create' : mode;
+  // Not approved yet: show the application (or the "under review" screen) instead of the listing tools.
+  if (hostStatus !== 'approved') {
+    return (
+      <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
+        <NavigationBar />
+        <Box sx={{ maxWidth: '100%', mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
+          <HostApplication application={application} />
+        </Box>
+      </Box>
+    );
+  }
+  const formOpen = mode !== 'list' || (autoCreate && ready && properties.length === 0);
   const pending = reservations.filter((r) => r.status === 'pending').length;
   const firstName = profile?.firstName || user.displayName || '';
 
+  const startCreate = () => {
+  setEditing(null);
+  setMode('create');
+  };
   const startEdit = (p) => {
     setEditing(p);
     setMode('edit');
   };
-  const backToList = () => {
-    setEditing(null);
+  const closeForm = () => {
     setMode('list');
     setAutoCreate(false);
+    // `editing` is cleared after the close animation (see the Dialog), so the form
+    // doesn't flash back to an empty "create" form while it fades out.
   };
 
+  // A listing with upcoming bookings (pending requests or confirmed stays that have
+  // not ended) cannot be deleted. The host has to decline or cancel those first.
   const remove = async (p) => {
+    const upcoming = reservations.filter(
+      (r) =>
+        r.propertyId === p.id &&
+        (r.status === 'pending' || r.status === 'confirmed') &&
+        r.checkOut >= todayISO()
+    );
+    if (upcoming.length > 0) {
+      setError(
+        `"${p.title}" has ${plural(upcoming.length, 'upcoming booking')}. Decline or cancel ${
+          upcoming.length === 1 ? 'it' : 'them'
+        } in Incoming guests before deleting this listing.`
+      );
+      return;
+    }
     if (!window.confirm(`Delete "${p.title}"? This can't be undone.`)) return;
     await deleteDoc(doc(db, 'properties', p.id)).catch(() => setError('Could not delete that listing.'));
   };
 
-  // Confirm or decline a request, and leave a message in the guest's inbox.
+  // Confirm or decline a request. Confirming books the nights, so it can fail
+  // if another confirmed booking already has any of those dates.
   const setStatus = async (r, status) => {
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'reservations', r.id), { status });
-      batch.set(doc(collection(db, 'notifications')), {
-        userId: r.guestId,
-        reservationId: r.id,
-        type: status === 'confirmed' ? 'reservation_confirmed' : 'reservation_declined',
-        propertyTitle: r.propertyTitle,
-        checkIn: r.checkIn,
-        checkOut: r.checkOut,
-        nights: r.nights ?? 0,
-        total: r.total ?? 0,
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-      await batch.commit();
-    } catch {
-      setError('Could not update that reservation.');
+      if (status === 'confirmed') await confirmReservation(r);
+      else await declineReservation(r);
+    } catch (err) {
+      setError(
+        err.message === 'overlap'
+          ? 'Those dates are not available (already booked or blocked), so this request cannot be confirmed. Decline it, open the dates, or cancel the other booking first.'
+          : 'Could not update that reservation.'
+      );
     }
   };
+
+  const cancelBooking = async (r) => {
+    if (!window.confirm(`Cancel ${r.guestName}'s booking at "${r.propertyTitle}"? The guest will be notified and the dates open up again.`)) return;
+    try {
+      await cancelReservation(r, 'host');
+    } catch {
+      setError('Could not cancel that booking. Please try again.');
+      return;
+    }
+    // A paid booking is refunded in full when the host cancels it.
+    if (paymentStatusOf(r) === 'paid') {
+      try {
+        await refundReservation(r);
+      } catch {
+        setError('The booking was cancelled, but the refund could not be processed. The guest can retry it from My bookings.');
+      }
+    }
+  };
+
+  // A pending request is in conflict once another request for the same place and
+  // overlapping dates has been confirmed. Pending requests never block each other.
+  const hasConflict = (r) =>
+    r.status === 'pending' &&
+    reservations.some(
+      (o) =>
+        o.id !== r.id &&
+        o.propertyId === r.propertyId &&
+        o.status === 'confirmed' &&
+        o.checkIn < r.checkOut &&
+        o.checkOut > r.checkIn
+    );
 
   const requestsFor = (id) => reservations.filter((r) => r.propertyId === id && r.status === 'pending').length;
   const reviewsByReservation = Object.fromEntries(reviews.map((rv) => [rv.id, rv]));
@@ -656,34 +734,25 @@ export default function MyProperty() {
   };
 
   return (
-    <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
+    <Box sx={{ bgcolor: '#fff', minHeight: '100vh', }}>
       <NavigationBar />
-      <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
+      <Box sx={{ maxWidth: '100%', mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-        {!ready && view === 'list' && (
+        {!ready &&(
           <Box sx={{ py: 8, textAlign: 'center' }}><CircularProgress /></Box>
         )}
 
-        {(view === 'create' || view === 'edit') && (
-          <ListingForm
-            key={editing?.id ?? 'new'}
-            initial={view === 'edit' ? editing : null}
-            onDone={backToList}
-            onCancel={properties.length > 0 ? backToList : undefined}
-          />
-        )}
-
-        {view === 'list' && ready && (
+        {ready && (
           <>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 3 }}>
               <Box>
                 <Typography sx={{ color: '#7A7070', fontWeight: 600, textAlign: 'left' }}>StayLang Host</Typography>
                 <Typography
                   component="h1"
-                  sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1, mt: 0.5 }}
+                  sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1, mt: 0.5, textAlign: 'left' }}
                 >
-                  {firstName ? `Welcome back, ${firstName}` : 'Your properties'}
+                  {firstName ? `Manage your properties` : 'Your properties'}
                 </Typography>
                 <Typography sx={{ color: '#7A7070', mt: 1, textAlign: 'left' }}>
                   Manage your places and see who is coming to stay.
@@ -692,7 +761,7 @@ export default function MyProperty() {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => setMode('create')}
+                onClick={startCreate}
                 sx={{ borderRadius: '10px', px: 2.5, boxShadow: '0 4px 12px rgba(69,123,145,.3)' }}
               >
                 Add property
@@ -745,6 +814,7 @@ export default function MyProperty() {
               <Tab label={`Properties (${properties.length})`} />
               <Tab label={`Incoming guests (${reservations.length})`} />
               <Tab label={`Reviews (${reviews.length})`} />
+              <Tab label="Availability" />
             </Tabs>
 
             <Fade in key={tab} timeout={250}>
@@ -758,7 +828,7 @@ export default function MyProperty() {
                         title="No properties yet"
                         text="Add your first place. It goes live for guests as soon as you publish it."
                         action={
-                          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setMode('create')}>
+                          <Button variant="contained" startIcon={<AddIcon />} onClick={startCreate}>
                             Add property
                           </Button>
                         }
@@ -790,7 +860,9 @@ export default function MyProperty() {
                           key={r.id}
                           r={r}
                           review={reviewsByReservation[r.id]}
+                          conflict={hasConflict(r)}
                           onStatus={setStatus}
+                          onCancel={cancelBooking}
                           onReply={openReply}
                         />
                       ))
@@ -799,11 +871,45 @@ export default function MyProperty() {
                 )}
 
                 {tab === 3 && <ReviewsPanel properties={properties} reviews={reviews} onReply={openReply} />}
+
+                {tab === 4 && <AvailabilityCalendar properties={properties} reservations={reservations} />}
               </Box>
             </Fade>
           </>
         )}
       </Box>
+
+        <Dialog
+          open={formOpen}
+          onClose={(_, reason) => {
+            // Clicking the backdrop would throw away a half-filled form, so only Esc and Cancel close it.
+            if (reason !== 'backdropClick') closeForm();
+          }}
+          scroll="body"
+          maxWidth={false}
+          aria-label={editing ? 'Edit listing' : 'Create listing'}
+          slotProps={{
+            paper: {
+              sx: {
+                width: '100%',
+                maxWidth: 960,
+                m: { xs: 1, md: 4 },
+                bgcolor: 'transparent',
+                boxShadow: 'none',
+                backgroundImage: 'none',
+                overflow: 'visible',
+              },
+            },
+            transition: { onExited: () => setEditing(null) },
+          }}
+        >
+          <ListingForm
+            key={editing?.id ?? 'new'}
+            initial={editing}
+            onDone={closeForm}
+            onCancel={closeForm}
+          />
+        </Dialog>
 
       <Dialog open={Boolean(replying)} onClose={closeReply} fullWidth maxWidth="sm" aria-labelledby="reply-title">
         <DialogTitle id="reply-title" sx={{ textAlign: 'left' }}>

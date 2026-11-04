@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import '@fontsource/urbanist/400.css';
 import '@fontsource/urbanist/600.css';
+import "leaflet/dist/leaflet.css";
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

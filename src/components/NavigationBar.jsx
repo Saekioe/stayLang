@@ -4,16 +4,19 @@ import {
   AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Badge, Divider,
   Drawer, List, ListItemButton, ListItemText, ListItemIcon, Menu, MenuItem,
 } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import MenuIcon from '@mui/icons-material/Menu';
-import LoginIcon from '@mui/icons-material/Login';
-import LogoutIcon from '@mui/icons-material/Logout';
-import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import { useAuth } from '../auth/Auth';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useNotifications } from '../dataqueries/Data';
 import EditProfile from './EditProfile';
+import logo from '../assets/logo.png';
+import theme from '../font/Theme';
+import { useHostApplication } from '../dataqueries/Host';
+
 
 const navLinks = [
   { label: 'Home', to: '/' },
@@ -21,6 +24,8 @@ const navLinks = [
   { label: 'Find Places', to: '/places' },
   { label: 'My Property', to: '/my-property' },
 ];
+
+
 
 export default function NavigationBar() {
   const { user, profile, loading, logout } = useAuth();
@@ -33,6 +38,16 @@ export default function NavigationBar() {
   const [anchorEl, setAnchorEl] = useState(null);
   const menuOpen = Boolean(anchorEl);
   const closeMenu = () => setAnchorEl(null);
+  // near the top of the component, after the other hooks
+  const isHost = Boolean(profile?.isHost);  
+
+  const { status: hostStatus } = useHostApplication(user?.uid);
+  const hostLabel = {
+    none: 'Apply as a Host',
+    pending: 'Application pending',
+    rejected: 'Reapply as a Host',
+    approved: "You're a host",
+  }[hostStatus];
 
   const [editOpen, setEditOpen] = useState(false);
 
@@ -53,7 +68,18 @@ export default function NavigationBar() {
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: '#0f4a5f' }}>
+            <Box
+              component="img"
+              src={logo}
+              alt="StayLang Logo"
+              sx={{ height: 35, ml: 1.25 }}
+            />
+            <Typography
+              variant="h6"
+              component={RouterLink}
+              to="/"
+              sx={{ fontWeight: 'bold', color: '#0f4a5f', textDecoration: 'none', fontSize: '1.1rem', ml: 1 }}
+            >
               StayLang
             </Typography>
           </Box>
@@ -81,6 +107,19 @@ export default function NavigationBar() {
           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
             {loading ? null : user ? (
               <>
+                <Button component={RouterLink} to="/my-property" variant="outlined" sx={{ borderRadius: '20px', fontSize: '0.8rem', px: 2, py: 0.5, mr: 1, borderColor: '#457B91', color: '#feffff', bgcolor: '#457B91', '&:hover': { bgcolor: '#F4F4F4', color: '#0F4A5F' } }}>
+                  {hostLabel}
+                </Button>
+                  <IconButton
+                    component={RouterLink}
+                    to="/notifications"
+                    color="inherit"
+                    aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+                  >
+                      <Badge badgeContent={unread} color="error" max={99}>
+                        <NotificationsIcon />
+                      </Badge>
+                  </IconButton>
                 <Button
                   color="inherit"
                   onClick={(e) => setAnchorEl(e.currentTarget)}
@@ -99,7 +138,7 @@ export default function NavigationBar() {
                   }}
                 >  
                     <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
-                      {displayName[0]?.toUpperCase()}
+                      
                     </Avatar>
                   <Typography variant="body2" sx={{ fontWeight: 600, ml: 1, display: { xs: 'none', sm: 'block' } }}>
                     {displayName}
@@ -142,7 +181,7 @@ export default function NavigationBar() {
               </>
             ) : (
               <>
-                <Button color="inherit" size="small" component={RouterLink} to="/login" startIcon={<LoginIcon />}>
+                <Button color="inherit" size="small" component={RouterLink} to="/login" >
                   Login
                 </Button>
                 <Button
@@ -151,14 +190,13 @@ export default function NavigationBar() {
                   size="small"
                   component={RouterLink}
                   to="/signup"
-                  startIcon={<PersonAddAltIcon />}
                   sx={{
                     display: { xs: 'none', sm: 'inline-flex' },
-                    bgcolor: '#D9D9D9',
+                    bgcolor: '#F8F5C5',
                     color: 'text.primary',
                     borderRadius: 99,
                     px: 2,
-                    '&:hover': { bgcolor: '#CFCFCF' },
+                    '&:hover': { bgcolor: '#f9ee5e' },
                   }}
                 >
                   Sign up

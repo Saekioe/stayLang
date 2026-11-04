@@ -3,24 +3,28 @@ import {
   Link as RouterLink, Navigate, Route, Routes, useLocation, useNavigate,
 } from 'react-router-dom';
 import {
-  Alert, AppBar, Box, Button, CircularProgress, Divider, Drawer, IconButton,
-  List, ListItem, ListItemButton, ListItemIcon, ListItemText, Paper, Toolbar, Typography,
+  Alert, Avatar, Badge, Box, CircularProgress, Divider, Drawer, IconButton,
+  List, ListItemButton, Typography,
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
-import HomeWorkIcon from '@mui/icons-material/HomeWork';
-import BookOnlineIcon from '@mui/icons-material/BookOnline';
-import RateReviewIcon from '@mui/icons-material/RateReview';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/Logout';
+import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
+import PeopleOutlineIcon from '@mui/icons-material/PeopleOutlined';
+import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlined';
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import MenuIcon from '@mui/icons-material/Menu';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { useAuth } from '../../auth/Auth';
-import { money } from '../../dataqueries/Booking';
-
+import { colors } from './adminUi';
+import adminLogo from '../../assets/adminLogo.png';
+ 
+import Overview from './Overview';
 import UserManagement from './UserManagement';
 import HostManagement from './HostManagement';
 import PropertyManagement from './PropertyManagement';
@@ -28,271 +32,222 @@ import ReservationMonitoring from './ReservationMonitoring';
 import ReviewModeration from './ReviewModeration';
 import Report from './Report';
 import Settings from './Settings';
-
+ 
 const ADMIN_EMAILS = ['admin@staylang.com'];
-const NAV_HEIGHT = 72;
 const BASE = '/admin';
-
+const SIDEBAR_WIDTH = 230;
+const TOPBAR_HEIGHT = 70;
+ 
 const menuItems = [
-  { label: 'Overview', path: BASE, icon: <DashboardIcon /> },
-  { label: 'User Management', path: `${BASE}/users`, icon: <PeopleIcon /> },
-  { label: 'Host Management', path: `${BASE}/hosts`, icon: <SupervisorAccountIcon /> },
-  { label: 'Property Management', path: `${BASE}/properties`, icon: <HomeWorkIcon /> },
-  { label: 'Reservation Monitoring', path: `${BASE}/reservations`, icon: <BookOnlineIcon /> },
-  { label: 'Review Moderation', path: `${BASE}/reviews`, icon: <RateReviewIcon /> },
-  { label: 'Reports', path: `${BASE}/reports`, icon: <AssessmentIcon /> },
-  { label: 'Settings', path: `${BASE}/settings`, icon: <SettingsIcon /> },
+  { label: 'Overview', crumb: 'Overview', path: BASE, Icon: GridViewOutlinedIcon },
+  { label: 'User Management', crumb: 'User Management', path: `${BASE}/users`, Icon: PeopleOutlineIcon },
+  { label: 'Host Management', crumb: 'Host Management', path: `${BASE}/hosts`, Icon: HowToRegOutlinedIcon },
+  { label: 'Property Management', crumb: 'Property Management', path: `${BASE}/properties`, Icon: HomeOutlinedIcon },
+  { label: 'Reservation Monitoring', crumb: 'Reservation Monitoring', path: `${BASE}/reservations`, Icon: CalendarMonthOutlinedIcon },
+  { label: 'Review Moderation', crumb: 'Review Moderation', path: `${BASE}/reviews`, Icon: ChatBubbleOutlineIcon },
+  { label: 'Reports', crumb: 'Reports', path: `${BASE}/reports`, Icon: BarChartOutlinedIcon },
+  { label: 'Settings', crumb: 'Settings', path: `${BASE}/settings`, Icon: TuneOutlinedIcon },
 ];
-
-function Overview({ users, properties, reservations }) {
-  const hosts = users.filter((u) => u.isHost || properties.some((p) => p.ownerId === u.id));
-  const totalEarnings = reservations
-    .filter((r) => r.status === 'confirmed')
-    .reduce((sum, r) => sum + (r.total || 0), 0);
-
+ 
+const avatarSx = { bgcolor: '#E3EEEF', color: colors.dark, fontSize: 11, fontWeight: 600 };
+ 
+function SidebarContent({ isActive, onNavigate, onLogout }) {
   return (
-    <Box>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, color: '#0F172A' }}>Platform Overview</Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2.5 }}>
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
-          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Total Accounts</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#0F172A' }}>{users.length}</Typography>
-        </Paper>
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
-          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Active Hosts</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#0F172A' }}>{hosts.length}</Typography>
-        </Paper>
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
-          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Listings</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#0F172A' }}>{properties.length}</Typography>
-        </Paper>
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFFFFF' }}>
-          <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>Total Volume</Typography>
-          <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, color: '#16A34A' }}>{money(totalEarnings)}</Typography>
-        </Paper>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: SIDEBAR_WIDTH, bgcolor: '#fff' }}>
+      {/* Brand */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 2.5, pt: 3, pb: 3 }}>
+        <Box component="img" src={adminLogo} alt="StayLang" sx={{ width: 34, height: 34, objectFit: 'contain' }} />
+        <Box>
+          <Typography sx={{ fontSize: 22, fontWeight: 500, color: colors.dark, lineHeight: 1.1 }}>StayLang</Typography>
+          <Typography sx={{ fontSize: 8, letterSpacing: '0.06em', color: colors.primary, textTransform: 'uppercase' }}>
+            Admin Control Panel
+          </Typography>
+        </Box>
+      </Box>
+ 
+      <Typography sx={{ fontSize: 10, letterSpacing: '0.08em', color: colors.muted, px: 3, mb: 1 }}>
+        WORKSPACE
+      </Typography>
+ 
+      {/* Navigation */}
+      <List disablePadding sx={{ px: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        {menuItems.map(({ label, path, Icon }) => {
+          const active = isActive(path);
+          return (
+            <ListItemButton
+              key={label}
+              component={RouterLink}
+              to={path}
+              selected={active}
+              onClick={onNavigate}
+              sx={{
+                height: 44,
+                borderRadius: '12px',
+                px: 1.5,
+                gap: 1.5,
+                color: active ? colors.dark : '#4A5560',
+                '&.Mui-selected, &.Mui-selected:hover': { bgcolor: colors.navActive },
+              }}
+            >
+              <Icon sx={{ fontSize: 20, color: 'inherit' }} />
+              <Typography sx={{ fontSize: 14, fontWeight: active ? 700 : 500, color: 'inherit' }}>{label}</Typography>
+            </ListItemButton>
+          );
+        })}
+      </List>
+ 
+      <Box sx={{ flex: 1 }} />
+ 
+      {/* Footer */}
+      <Divider sx={{ mx: 2 }} />
+      <Box sx={{ px: 2, py: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1.5 }}>
+          <Avatar sx={{ ...avatarSx, width: 32, height: 32 }}>AD</Avatar>
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: colors.title, lineHeight: 1.3 }}>Administrator</Typography>
+            <Typography sx={{ fontSize: 11, color: colors.muted }}>Platform admin</Typography>
+          </Box>
+        </Box>
+        <ListItemButton onClick={onLogout} sx={{ borderRadius: '10px', px: 1, gap: 1.5, color: '#4A5560' }}>
+          <LogoutOutlinedIcon sx={{ fontSize: 20 }} />
+          <Typography sx={{ fontSize: 14, fontWeight: 500, color: 'inherit' }}>Logout</Typography>
+        </ListItemButton>
       </Box>
     </Box>
   );
 }
-
+ 
 export default function AdminDashboard() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Firestore collections state (used by the Overview)
+ 
+  // Firestore collections (used by the Overview)
   const [users, setUsers] = useState([]);
   const [properties, setProperties] = useState([]);
   const [reservations, setReservations] = useState([]);
-
   const [error, setError] = useState('');
-
+ 
   useEffect(() => {
     if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) return;
-
+ 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => setError('Failed to stream users.'));
-
+ 
     const unsubProps = onSnapshot(collection(db, 'properties'), (snap) => {
       setProperties(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => setError('Failed to stream properties.'));
-
+ 
     const unsubRes = onSnapshot(collection(db, 'reservations'), (snap) => {
       setReservations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, () => setError('Failed to stream reservations.'));
-
+ 
     return () => {
       unsubUsers();
       unsubProps();
       unsubRes();
     };
   }, [user]);
-
+ 
   const isActive = (path) => (path === BASE ? pathname === BASE : pathname.startsWith(path));
-
+  const current = menuItems.find((m) => isActive(m.path)) ?? menuItems[0];
+ 
   const handleLogout = async () => {
     try {
-      if (logout) {
-        await logout();
-      }
+      if (logout) await logout();
       navigate('/login');
     } catch {
       setError('Failed to log out.');
     }
   };
-
-  // Access Control Guard
-  if (loading) return <Box sx={{ py: 12, textAlign: 'center' }}><CircularProgress sx={{ color: '#1E3A8A' }} /></Box>;
+ 
+  // Access control guard
+  if (loading) {
+    return <Box sx={{ py: 12, textAlign: 'center' }}><CircularProgress sx={{ color: colors.dark }} /></Box>;
+  }
   if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
     return <Navigate to="/login" replace />;
   }
-
+ 
   return (
-    <Box sx={{ bgcolor: '#F8FAFC', minHeight: '100vh' }}>
-      {/* Top Navigation Bar */}
-      <AppBar position="fixed" elevation={0} sx={{ backgroundColor: '#FFFFFF', color: '#0F172A', borderBottom: '1px solid #E2E8F0' }}>
-        <Toolbar sx={{ px: { xs: 2, md: 6 }, minHeight: NAV_HEIGHT, justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: colors.pageBg, textAlign: 'left' }}>
+      {/* Desktop sidebar */}
+      <Box
+        component="aside"
+        sx={{
+          display: { xs: 'none', lg: 'block' },
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: SIDEBAR_WIDTH,
+          borderRight: `1px solid ${colors.line}`,
+          bgcolor: '#fff',
+          zIndex: 10,
+        }}
+      >
+        <SidebarContent isActive={isActive} onLogout={handleLogout} />
+      </Box>
+ 
+      {/* Mobile sidebar */}
+      <Drawer anchor="left" open={mobileOpen} onClose={() => setMobileOpen(false)} sx={{ display: { lg: 'none' } }}>
+        <SidebarContent isActive={isActive} onNavigate={() => setMobileOpen(false)} onLogout={handleLogout} />
+      </Drawer>
+ 
+      {/* Right side */}
+      <Box sx={{ flex: 1, minWidth: 0, ml: { xs: 0, lg: `${SIDEBAR_WIDTH}px` }, display: 'flex', flexDirection: 'column' }}>
+        {/* Top bar */}
+        <Box
+          component="header"
+          sx={{
+            height: TOPBAR_HEIGHT,
+            px: { xs: 2, md: 4.5 },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            bgcolor: '#fff',
+            borderBottom: `1px solid ${colors.line}`,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <IconButton
-              color="inherit"
               aria-label="Open menu"
               onClick={() => setMobileOpen(true)}
-              sx={{ display: { lg: 'none' }, mr: 1 }}
+              sx={{ display: { lg: 'none' }, mr: 0.5 }}
             >
               <MenuIcon />
             </IconButton>
-            <Box>
-              <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: '#457B91', lineHeight: 1.2 }}>
-                StayLang
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#64748B', display: 'block', lineHeight: 1, fontWeight: 500 }}>
-                Admin Control Panel
-              </Typography>
-            </Box>
+            <Typography sx={{ fontSize: 13, color: colors.muted }}>Admin workspace</Typography>
+            <ChevronRightIcon sx={{ fontSize: 16, color: colors.muted }} />
+            <Typography sx={{ fontSize: 13, color: colors.title, fontWeight: 500 }}>{current.crumb}</Typography>
           </Box>
-
-          <Box sx={{ flex: 1, display: { lg: 'none' } }} />
-
-          <Button
-            color="inherit"
-            onClick={handleLogout}
-            startIcon={<LogoutIcon />}
-            sx={{
-              borderRadius: 99,
-              px: 2.5,
-              py: 0.75,
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              flexShrink: 0,
-              color: '#457B91',
-              border: '1px solid #CBD5E1',
-              '&:hover': { bgcolor: '#F1F5F9', borderColor: '#457B91' },
-            }}
-          >
-            Logout
-          </Button>
-        </Toolbar>
-
-        {/* Mobile drawer */}
-        <Drawer anchor="left" open={mobileOpen} onClose={() => setMobileOpen(false)}>
-          <List sx={{ width: 260, pt: 2, bgcolor: '#FFFFFF', height: '100%' }}>
-            {menuItems.map((item) => (
-              <ListItem key={item.label} disablePadding sx={{ px: 1, mb: 0.5 }}>
-                <ListItemButton
-                  component={RouterLink}
-                  to={item.path}
-                  selected={isActive(item.path)}
-                  onClick={() => setMobileOpen(false)}
-                  sx={{
-                    borderRadius: 2,
-                    '&.Mui-selected': {
-                      bgcolor: '#EEF2F6',
-                      color: '#1E3A8A',
-                      '& .MuiListItemIcon-root': { color: '#1E3A8A' },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: 600, fontSize: '0.9rem' }} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-          <Divider sx={{ my: 1 }} />
-          <List sx={{ px: 1 }}>
-            <ListItem disablePadding>
-              <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2 }}>
-                <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}><LogoutIcon /></ListItemIcon>
-                <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 600, fontSize: '0.9rem' }} />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </Drawer>
-      </AppBar>
-
-      {/* Main Content Area with 20-80 Grid persistent across all pages */}
-      <Box component="main" sx={{ pt: `${NAV_HEIGHT + 32}px`, px: { xs: 2, md: 6 }, pb: 6 }}>
-        {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
-
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '20% 80%' }, gap: 4, alignItems: 'flex-start' }}>
-          {/* 20% Column: Persistent Navigation Buttons */}
-          <Box
-            sx={{
-              display: { xs: 'none', md: 'flex' },
-              flexDirection: 'column',
-              gap: 1,
-              bgcolor: '#FFFFFF',
-              p: 2,
-              borderRadius: 3,
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 1px 10px rgba(0,0,0,0.02)',
-            }}
-          >
-            {menuItems.map((item) => {
-              const active = isActive(item.path);
-              return (
-                <Button
-                  key={item.label}
-                  component={RouterLink}
-                  to={item.path}
-                  variant={active ? 'contained' : 'text'}
-                  startIcon={item.icon}
-                  sx={{
-                    justifyContent: 'flex-start',
-                    py: 1.5,
-                    px: 2,
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    bgcolor: active ? '#457B91' : 'transparent',
-                    color: active ? '#FFFFFF' : '#475569',
-                    boxShadow: 'none',
-                    '& .MuiButton-startIcon': {
-                      color: active ? '#FFFFFF' : '#64748B',
-                    },
-                    '&:hover': {
-                      bgcolor: active ? '#457B91' : '#F8FAFC',
-                      color: active ? '#FFFFFF' : '#1E293B',
-                      boxShadow: 'none',
-                    },
-                  }}
-                >
-                  {item.label}
-                </Button>
-              );
-            })}
+ 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Badge variant="dot" overlap="circular" sx={{ '& .MuiBadge-badge': { bgcolor: colors.dark } }}>
+              <NotificationsNoneOutlinedIcon sx={{ fontSize: 22, color: '#6B7280' }} />
+            </Badge>
+            <Avatar sx={{ ...avatarSx, width: 30, height: 30 }}>AD</Avatar>
           </Box>
-
-          {/* 80% Column: Dynamic Sub-page Content */}
-          <Box
-            sx={{
-              width: '100%',
-              minWidth: 0,
-              bgcolor: '#FFFFFF',
-              p: { xs: 2.5, md: 4 },
-              borderRadius: 3,
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            }}
-          >
-            <Routes>
-              <Route
-                index
-                element={<Overview users={users} properties={properties} reservations={reservations} />}
-              />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="hosts" element={<HostManagement />} />
-              <Route path="properties" element={<PropertyManagement />} />
-              <Route path="reservations" element={<ReservationMonitoring />} />
-              <Route path="reviews" element={<ReviewModeration />} />
-              <Route path="reports" element={<Report />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to={BASE} replace />} />
-            </Routes>
-          </Box>
+        </Box>
+ 
+        {/* Page content */}
+        <Box component="main" sx={{ flex: 1, minWidth: 0, px: { xs: 2, md: 4.5 }, py: { xs: 3, md: 5 } }}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>
+          )}
+          <Routes>
+            <Route index element={<Overview users={users} properties={properties} reservations={reservations} />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="hosts" element={<HostManagement />} />
+            <Route path="properties" element={<PropertyManagement />} />
+            <Route path="reservations" element={<ReservationMonitoring />} />
+            <Route path="reviews" element={<ReviewModeration />} />
+            <Route path="reports" element={<Report />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to={BASE} replace />} />
+          </Routes>
         </Box>
       </Box>
     </Box>

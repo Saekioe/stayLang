@@ -8,6 +8,7 @@ import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/aut
 import { auth } from '../firebase/firebase';
 import { useAuth, authMessage, resolveEmail } from '../auth/Auth';
 import { Field, AuthCard } from '../components/Authui';
+import bg from '../assets/bg.jpg';
 
 const ADMIN_EMAILS = ['admin@staylang.com'];
 
@@ -60,6 +61,7 @@ export default function Login() {
   };
 
   return (
+    
     <AuthCard title="Login">
       <Box component="form" onSubmit={handleLogin} noValidate>
         {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}

@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, Avatar, Box, Button, ButtonBase, Chip, Dialog, IconButton, Link, MenuItem, Rating, TextField, Typography,
@@ -12,12 +16,12 @@ import PeopleIcon from '@mui/icons-material/People';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import { labelFont } from '../font/Theme';
 import { usePropertyReviews } from '../dataqueries/Data';
-import { computeQuote, money, usePlatformSettings } from '../dataqueries/Booking';
+import { computeQuote, money, nightsBetween, useBookedNights, usePlatformSettings } from '../dataqueries/Booking';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -51,6 +55,7 @@ function Details({ place, onClose }) {
   const nights =
     checkIn && checkOut ? Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000) : 0;
   const { serviceFeePercent } = usePlatformSettings();
+  const bookedNights = useBookedNights(place.id);
   const quote = computeQuote({
     pricePerNight: place.pricePerNight,
     nights,
@@ -63,6 +68,9 @@ function Details({ place, onClose }) {
   const minCheckout = checkIn ? addDays(checkIn, 1) : today;
   const maxCheckout = checkIn && place.maxStay ? addDays(checkIn, place.maxStay) : undefined;
 
+  // A stay is free when none of its nights is booked or blocked.
+  const stayIsFree = (ci, co) => nightsBetween(ci, co).every((d) => !bookedNights.includes(d));
+
   const handleCheckIn = (value) => {
     setCheckIn(value);
     setNotice(null);
@@ -70,7 +78,8 @@ function Details({ place, onClose }) {
     if (value && checkOut) {
       const tooEarly = checkOut <= value;
       const tooLate = place.maxStay && checkOut > addDays(value, place.maxStay);
-      if (tooEarly || tooLate) setCheckOut('');
+      const taken = !stayIsFree(value, checkOut);
+      if (tooEarly || tooLate || taken) setCheckOut('');
     }
   };
 
@@ -98,8 +107,34 @@ function Details({ place, onClose }) {
       });
       return;
     }
+    if (nightsBetween(checkIn, checkOut).some((d) => bookedNights.includes(d))) {
+      setNotice({ severity: 'error', text: 'Some of those nights are not available. Please choose different dates.' });
+      return;
+    }
     setBusy(true);
     try {
+      const mine = await getDocs(
+        query(
+          collection(db, 'reservations'),
+          where('guestId', '==', user.uid),
+          where('propertyId', '==', place.id)
+        )
+      );
+      const clash = mine.docs.some((d) => {
+        const r = d.data();
+        return (
+          (r.status === 'pending' || r.status === 'confirmed') &&
+          r.checkIn < checkOut &&   // existing starts before the new one ends
+          r.checkOut > checkIn      // existing ends after the new one starts
+        );
+      });
+      if (clash) {
+        setNotice({
+          severity: 'error',
+          text: 'You already have a request for this place that overlaps these dates.',
+        });
+        return;
+      }
       await addDoc(collection(db, 'reservations'), {
         propertyId: place.id,
         propertyTitle: place.name,
@@ -119,6 +154,7 @@ function Details({ place, onClose }) {
         serviceFee: quote.serviceFee,
         total: quote.total,
         currency: 'PHP',
+        paymentStatus: 'unpaid',
         status: 'pending',
         createdAt: serverTimestamp(),
       });
@@ -131,6 +167,7 @@ function Details({ place, onClose }) {
   };
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
     <Box sx={{ position: 'relative', p: { xs: 2, md: 4 } }}>
       <IconButton
         aria-label="Close"
@@ -278,25 +315,26 @@ function Details({ place, onClose }) {
             ) : null}
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 1.5 }}>
-              <TextField
-                size="small"
-                type="date"
+              <DatePicker
                 label="Check-in"
-                value={checkIn}
-                onChange={(e) => handleCheckIn(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: today } }}
+                value={checkIn ? dayjs(checkIn) : null}
+                onChange={(v) => handleCheckIn(v?.isValid() ? v.format('YYYY-MM-DD') : '')}
+                minDate={dayjs(today)}
+                shouldDisableDate={(d) => bookedNights.includes(d.format('YYYY-MM-DD'))}
+                slotProps={{ textField: { size: 'small' } }}
               />
-              <TextField
-                size="small"
-                type="date"
+              <DatePicker
                 label="Check-out"
-                value={checkOut}
+                value={checkOut ? dayjs(checkOut) : null}
                 disabled={!checkIn}
-                onChange={(e) => setCheckOut(e.target.value)}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                  htmlInput: { min: minCheckout, ...(maxCheckout ? { max: maxCheckout } : {}) },
+                onChange={(v) => {
+                  setCheckOut(v?.isValid() ? v.format('YYYY-MM-DD') : '');
+                  setNotice(null);
                 }}
+                minDate={dayjs(minCheckout)}
+                {...(maxCheckout ? { maxDate: dayjs(maxCheckout) } : {})}
+                shouldDisableDate={(d) => !stayIsFree(checkIn, d.format('YYYY-MM-DD'))}
+                slotProps={{ textField: { size: 'small' } }}
               />
             </Box>
             <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
@@ -392,6 +430,7 @@ function Details({ place, onClose }) {
         </Box>
       </Box>
     </Box>
+    </LocalizationProvider>
   );
 }
 

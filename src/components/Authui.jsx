@@ -3,6 +3,8 @@ import { Link as RouterLink } from 'react-router-dom';
 import { Box, Divider, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import bg from '../assets/bg.jpg';
+import logo from '../assets/logo.png';
 
 // Gray filled input with its label above, like the Figma frames.
 // `htmlInput` passes attributes to the native <input> (e.g. { max: '2026-10-17' }).
@@ -53,15 +55,9 @@ export function Field({ label, type = 'text', htmlInput, ...props }) {
 
 export function AuthCard({ title, subtitle, children }) {
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default' }}>
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.13), rgba(29, 23, 23, 0.9)), url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <Paper elevation={0} sx={{ width: '100%', maxWidth: 480, p: 4, borderRadius: '16px' }}>
-        <Typography
-          component={RouterLink}
-          to="/"
-          sx={{ display: 'block', textAlign: 'center', fontWeight: 700, color: 'text.primary', textDecoration: 'none', color: '#575656' }}
-        >
-          StayLang
-        </Typography>
+        <Box component="img" src={logo} alt="StayLang Logo" sx={{ height: 40, display: 'block', mx: 'auto', mb: 1.5 }} />
         <Typography variant="h5" component="h1" sx={{ textAlign: 'center', fontWeight: 600, mt: 0.5, color: 'text.primary' }}>
           {title}
         </Typography>

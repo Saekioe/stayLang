@@ -11,9 +11,14 @@ import {
   Typography,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import NavigationBar from '../components/NavigationBar';
 import { PlaceGrid } from '../components/Places';
 import { usePlaces } from '../dataqueries/Data';
+import { nightsBetween, todayISO, useUnavailablePropertyIds } from '../dataqueries/Booking';
 
 export default function FindPlaces() {
   const { places, error } = usePlaces();
@@ -22,6 +27,10 @@ export default function FindPlaces() {
   const [propertyType, setPropertyType] = useState('all');
   const [minBedrooms, setMinBedrooms] = useState('all');
   const [minGuests, setMinGuests] = useState('all');
+  const [checkIn, setCheckIn] = useState('');
+  const [checkOut, setCheckOut] = useState('');
+  const unavailable = useUnavailablePropertyIds(checkIn, checkOut);
+  const stayNights = checkIn && checkOut ? nightsBetween(checkIn, checkOut).length : 0;
 
   const q = query.trim().toLowerCase();
 
@@ -35,7 +44,10 @@ export default function FindPlaces() {
     const matchesBedrooms = minBedrooms === 'all' || p.bedrooms >= Number(minBedrooms);
     const matchesGuests = minGuests === 'all' || (p.capacity && p.capacity >= Number(minGuests));
 
-    return matchesQuery && matchesPrice && matchesType && matchesBedrooms && matchesGuests;
+    // With dates chosen, hide places with a taken night in the stay or a shorter maximum stay.
+    const matchesDates = !stayNights || (!unavailable.has(p.id) && (!p.maxStay || stayNights <= p.maxStay));
+
+    return matchesQuery && matchesPrice && matchesType && matchesBedrooms && matchesGuests && matchesDates;
   });
 
   const handleClearFilters = () => {
@@ -44,14 +56,16 @@ export default function FindPlaces() {
     setPropertyType('all');
     setMinBedrooms('all');
     setMinGuests('all');
+    setCheckIn('');
+    setCheckOut('');
   };
 
-  const hasActiveFilters = q || maxPrice || propertyType !== 'all' || minBedrooms !== 'all' || minGuests !== 'all';
+  const hasActiveFilters = q || maxPrice || propertyType !== 'all' || minBedrooms !== 'all' || minGuests !== 'all' || checkIn || checkOut;
   const padding = hasActiveFilters ? 0 : Math.max(0, 5 - results.length);
   const items = [...results, ...Array.from({ length: padding }, () => null)];
 
   return (
-    <>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
       <NavigationBar />
       <Box
         sx={{
@@ -126,6 +140,26 @@ export default function FindPlaces() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 1, color: '#213f30' }}>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>Filters:</Typography>
             </Box>
+
+            {/* Dates: only places free for the whole stay are shown */}
+            <DatePicker
+              label="Check-in"
+              value={checkIn ? dayjs(checkIn) : null}
+              minDate={dayjs(todayISO())}
+              onChange={(v) => {
+                const iso = v?.isValid() ? v.format('YYYY-MM-DD') : '';
+                setCheckIn(iso);
+                if (iso && checkOut && checkOut <= iso) setCheckOut('');
+              }}
+              slotProps={{ textField: { size: 'small', sx: { width: 165, bgcolor: '#fff' } } }}
+            />
+            <DatePicker
+              label="Check-out"
+              value={checkOut ? dayjs(checkOut) : null}
+              minDate={checkIn ? dayjs(checkIn).add(1, 'day') : dayjs(todayISO()).add(1, 'day')}
+              onChange={(v) => setCheckOut(v?.isValid() ? v.format('YYYY-MM-DD') : '')}
+              slotProps={{ textField: { size: 'small', sx: { width: 165, bgcolor: '#fff' } } }}
+            />
 
             {/* Max Price Filter */}
             <TextField
@@ -223,6 +257,6 @@ export default function FindPlaces() {
           )}
         </Box>
       </Box>
-    </>
+    </LocalizationProvider>
   );
 }
