@@ -11,22 +11,26 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import {
-  collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch,
+  collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
-import { hostPayout, money } from '../dataqueries/Booking';
+import AvailabilityCalendar from '../components/AvailabilityCalendar';
+import {
+  STATUS_LABELS, cancelReservation, confirmReservation, declineReservation, hostPayout, money, statusOf, todayISO,
+} from '../dataqueries/Booking';
 
 const statusStyle = {
   pending: { bgcolor: '#FBF1C0', color: '#6B5200' },
   confirmed: { bgcolor: '#E8F1F4', color: '#2F5E70' },
   declined: { bgcolor: '#EFECEC', color: '#7A7070' },
+  cancelled: { bgcolor: '#F8E1DF', color: '#8A2E26' },
+  completed: { bgcolor: '#E3EAF7', color: '#27437A' },
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const capitalize = (s = '') => s.charAt(0).toUpperCase() + s.slice(1);
 
 const fmt = (d) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -347,7 +351,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
   );
 }
 
-function RequestRow({ r, review, onStatus, onReply }) {
+function RequestRow({ r, review, onStatus, onCancel, onReply }) {
   const pending = r.status === 'pending';
   const placed = r.createdAt?.toDate
     ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -390,7 +394,12 @@ function RequestRow({ r, review, onStatus, onReply }) {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Chip size="small" label={capitalize(r.status)} sx={{ fontWeight: 600, ...statusStyle[r.status] }} />
+          <Chip size="small" label={STATUS_LABELS[statusOf(r)] ?? r.status} sx={{ fontWeight: 600, ...statusStyle[statusOf(r)] }} />
+          {r.status === 'confirmed' && r.checkIn > todayISO() && (
+            <Button size="small" color="inherit" onClick={() => onCancel(r)}>
+              Cancel booking
+            </Button>
+          )}
           {pending && (
             <>
               <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} onClick={() => onStatus(r, 'confirmed')}>
@@ -544,7 +553,7 @@ export default function MyProperty() {
   const [replying, setReplying] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [replySaving, setReplySaving] = useState(false);
-  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews
+  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews, 4 availability
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -601,45 +610,48 @@ export default function MyProperty() {
     setAutoCreate(false);
   };
 
+  // A listing with upcoming bookings (pending requests or confirmed stays that have
+  // not ended) cannot be deleted. The host has to decline or cancel those first.
   const remove = async (p) => {
+    const upcoming = reservations.filter(
+      (r) =>
+        r.propertyId === p.id &&
+        (r.status === 'pending' || r.status === 'confirmed') &&
+        r.checkOut >= todayISO()
+    );
+    if (upcoming.length > 0) {
+      setError(
+        `"${p.title}" has ${plural(upcoming.length, 'upcoming booking')}. Decline or cancel ${
+          upcoming.length === 1 ? 'it' : 'them'
+        } in Incoming guests before deleting this listing.`
+      );
+      return;
+    }
     if (!window.confirm(`Delete "${p.title}"? This can't be undone.`)) return;
     await deleteDoc(doc(db, 'properties', p.id)).catch(() => setError('Could not delete that listing.'));
   };
 
-  // Confirm or decline a request, and leave a message in the guest's inbox.
+  // Confirm or decline a request. Confirming books the nights, so it can fail
+  // if another confirmed booking already has any of those dates.
   const setStatus = async (r, status) => {
     try {
-      if (status === 'confirmed') {
-        const conflict = reservations.some(
-          (o) =>
-            o.id !== r.id &&
-            o.propertyId === r.propertyId &&
-            o.status === 'confirmed' &&
-            o.checkIn < r.checkOut &&
-            o.checkOut > r.checkIn
-        );
-        if (conflict) {
-          setError('These dates overlap with an already confirmed booking.');
-          return;
-        }
-      }
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'reservations', r.id), { status });
-      batch.set(doc(collection(db, 'notifications')), {
-        userId: r.guestId,
-        reservationId: r.id,
-        type: status === 'confirmed' ? 'reservation_confirmed' : 'reservation_declined',
-        propertyTitle: r.propertyTitle,
-        checkIn: r.checkIn,
-        checkOut: r.checkOut,
-        nights: r.nights ?? 0,
-        total: r.total ?? 0,
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-      await batch.commit();
+      if (status === 'confirmed') await confirmReservation(r);
+      else await declineReservation(r);
+    } catch (err) {
+      setError(
+        err.message === 'overlap'
+          ? 'Those dates are not available (already booked or blocked), so this request cannot be confirmed. Decline it, open the dates, or cancel the other booking first.'
+          : 'Could not update that reservation.'
+      );
+    }
+  };
+
+  const cancelBooking = async (r) => {
+    if (!window.confirm(`Cancel ${r.guestName}'s booking at "${r.propertyTitle}"? The guest will be notified and the dates open up again.`)) return;
+    try {
+      await cancelReservation(r, 'host');
     } catch {
-      setError('Could not update that reservation.');
+      setError('Could not cancel that booking. Please try again.');
     }
   };
 
@@ -759,6 +771,7 @@ export default function MyProperty() {
               <Tab label={`Properties (${properties.length})`} />
               <Tab label={`Incoming guests (${reservations.length})`} />
               <Tab label={`Reviews (${reviews.length})`} />
+              <Tab label="Availability" />
             </Tabs>
 
             <Fade in key={tab} timeout={250}>
@@ -805,6 +818,7 @@ export default function MyProperty() {
                           r={r}
                           review={reviewsByReservation[r.id]}
                           onStatus={setStatus}
+                          onCancel={cancelBooking}
                           onReply={openReply}
                         />
                       ))
@@ -813,6 +827,8 @@ export default function MyProperty() {
                 )}
 
                 {tab === 3 && <ReviewsPanel properties={properties} reviews={reviews} onReply={openReply} />}
+
+                {tab === 4 && <AvailabilityCalendar properties={properties} reservations={reservations} />}
               </Box>
             </Fade>
           </>

@@ -10,7 +10,7 @@ import {
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
-import { money } from '../dataqueries/Booking';
+import { cancelReservation, money, statusOf, todayISO } from '../dataqueries/Booking';
 
 // Set to true to let guests review only after their check-out date has passed.
 const ONLY_AFTER_CHECKOUT = true;
@@ -18,17 +18,14 @@ const ONLY_AFTER_CHECKOUT = true;
 const statusInfo = {
   pending: { label: 'Waiting for the host', sx: { bgcolor: '#FBF1C0', color: '#6B5200' } },
   confirmed: { label: 'Confirmed', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
+  completed: { label: 'Completed', sx: { bgcolor: '#E3EAF7', color: '#27437A' } },
   declined: { label: 'Declined', sx: { bgcolor: '#EFECEC', color: '#7A7070' } },
+  cancelled: { label: 'Cancelled', sx: { bgcolor: '#F8E1DF', color: '#8A2E26' } },
 };
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const fmt = (d) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-const pad = (n) => String(n).padStart(2, '0');
-const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 
 export default function MyBookings() {
   const { user, profile, loading } = useAuth();
@@ -37,6 +34,7 @@ export default function MyBookings() {
   const [reviews, setReviews] = useState({}); // keyed by reservation id
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [cancellingId, setCancellingId] = useState('');
 
   // review dialog
   const [reviewing, setReviewing] = useState(null);
@@ -75,6 +73,22 @@ export default function MyBookings() {
     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
   }
   if (!user) return <Navigate to="/login" replace />;
+
+  // A guest can cancel a pending or confirmed booking until the day of check-in.
+  const canCancel = (b) => (b.status === 'pending' || b.status === 'confirmed') && b.checkIn > todayISO();
+
+  const cancelBooking = async (b) => {
+    if (!window.confirm(`Cancel your booking at "${b.propertyTitle}"?`)) return;
+    setError('');
+    setCancellingId(b.id);
+    try {
+      await cancelReservation(b, 'guest');
+    } catch {
+      setError('We could not cancel that booking. Please try again.');
+    } finally {
+      setCancellingId('');
+    }
+  };
 
   const canReview = (b) =>
     b.status === 'confirmed' && (!ONLY_AFTER_CHECKOUT || b.checkOut <= todayISO());
@@ -163,7 +177,7 @@ export default function MyBookings() {
             </Box>
           ) : (
             bookings.map((b) => {
-              const info = statusInfo[b.status] ?? statusInfo.pending;
+              const info = statusInfo[statusOf(b)] ?? statusInfo.pending;
               const review = reviews[b.id];
               return (
                 <Box
@@ -184,8 +198,25 @@ export default function MyBookings() {
                       <Typography variant="body2" sx={{ color: '#7A7070' }}>
                         {plural(b.guests ?? 1, 'guest')}, {money(b.total)} total
                       </Typography>
+                      {b.serviceFee != null && (
+                        <Typography variant="caption" sx={{ color: '#7A7070', display: 'block' }}>
+                          Includes {money(b.cleaningFee ?? 0)} cleaning fee and {money(b.serviceFee)} service fee
+                        </Typography>
+                      )}
+                      {b.status === 'cancelled' && (
+                        <Typography variant="body2" sx={{ color: '#8A2E26', mt: 0.5 }}>
+                          Cancelled by {b.cancelledBy === 'host' ? 'the host' : 'you'}.
+                        </Typography>
+                      )}
                     </Box>
-                    <Chip label={info.label} sx={{ fontWeight: 600, ...info.sx }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {canCancel(b) && (
+                        <Button size="small" color="inherit" disabled={cancellingId === b.id} onClick={() => cancelBooking(b)}>
+                          {cancellingId === b.id ? 'Cancelling…' : 'Cancel booking'}
+                        </Button>
+                      )}
+                      <Chip label={info.label} sx={{ fontWeight: 600, ...info.sx }} />
+                    </Box>
                   </Box>
 
                   {b.status === 'confirmed' && (

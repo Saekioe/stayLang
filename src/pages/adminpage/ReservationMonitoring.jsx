@@ -5,7 +5,9 @@ import {
 } from '@mui/material';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
-import { money } from '../../dataqueries/Booking';
+import { STATUS_LABELS, money, statusOf } from '../../dataqueries/Booking';
+
+const chipColor = { confirmed: 'success', completed: 'info', pending: 'warning', cancelled: 'error', declined: 'default' };
 
 export default function ReservationMonitoring() {
   const [reservations, setReservations] = useState([]);
@@ -45,7 +47,7 @@ export default function ReservationMonitoring() {
                   <TableCell>{r.checkIn} to {r.checkOut}</TableCell>
                   <TableCell>{money(r.total)}</TableCell>
                   <TableCell>
-                    <Chip size="small" label={r.status} color={r.status === 'confirmed' ? 'success' : r.status === 'pending' ? 'warning' : 'default'} />
+                    <Chip size="small" label={STATUS_LABELS[statusOf(r)] ?? r.status} color={chipColor[statusOf(r)] ?? 'default'} />
                   </TableCell>
                 </TableRow>
               ))
