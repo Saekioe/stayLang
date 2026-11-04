@@ -154,6 +154,7 @@ function Details({ place, onClose }) {
         serviceFee: quote.serviceFee,
         total: quote.total,
         currency: 'PHP',
+        paymentStatus: 'unpaid',
         status: 'pending',
         createdAt: serverTimestamp(),
       });

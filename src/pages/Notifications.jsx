@@ -68,6 +68,27 @@ function describe(n) {
             chip: { label: 'Cancelled', sx: { bgcolor: '#F8E1DF', color: '#8A2E26' } },
             link: '/my-bookings',
           };
+    case 'payment_confirmed':
+      return {
+        title: `Payment received for ${n.propertyTitle}`,
+        body: `${when}. You paid ${money(n.total)}.`,
+        chip: { label: 'Paid', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
+        link: '/my-bookings',
+      };
+    case 'payment_received':
+      return {
+        title: `A guest paid for ${n.propertyTitle}`,
+        body: `${when}. ${money(n.total)} was paid.`,
+        chip: { label: 'Paid', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
+        link: '/my-property',
+      };
+    case 'payment_refunded':
+      return {
+        title: `Your payment for ${n.propertyTitle} was refunded`,
+        body: `${when}. ${money(n.total)} was returned to you.`,
+        chip: { label: 'Refunded', sx: { bgcolor: '#E3EAF7', color: '#27437A' } },
+        link: '/my-bookings',
+      };
     default:
       return {
         title: n.propertyTitle ?? 'Update',
