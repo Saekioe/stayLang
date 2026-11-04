@@ -16,7 +16,9 @@ import { useAuth } from '../auth/Auth';
 import { amenityOptions, propertyTypes } from '../dataqueries/Data';
 
 const MAX_IMAGES = 4;
-const MAX_IMAGE_CHARS = 850000;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB per original photo
+const MAX_IMAGE_CHARS = 850000; // total for all photos, keeps the doc under 1 MB
+
 
 const SAFETY_FEATURES = [
   { key: 'smokeAlarm', label: 'Smoke alarm' },
@@ -25,7 +27,7 @@ const SAFETY_FEATURES = [
   { key: 'fireExtinguisher', label: 'Fire extinguisher' },
 ];
 
-function compressImage(file, maxSize = 900, quality = 0.6) {
+function compressImage(file, maxSize = 800, quality = 0.6) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -34,7 +36,10 @@ function compressImage(file, maxSize = 900, quality = 0.6) {
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
@@ -164,19 +169,28 @@ export default function ListingForm({ initial, onDone, onCancel }) {
     }));
 
   const addFiles = async (picked) => {
-    const files = picked.filter((f) => f.type.startsWith('image/'));
-    if (!files.length) return setError('Choose image files such as JPG or PNG.');
-    setError('');
-    const room = MAX_IMAGES - form.images.length;
-    if (room <= 0) return setError(`You can add up to ${MAX_IMAGES} photos.`);
-    try {
-      const added = await Promise.all(files.slice(0, room).map((f) => compressImage(f)));
-      setForm((f) => ({ ...f, images: [...f.images, ...added] }));
-      if (files.length > room) setError(`Only ${MAX_IMAGES} photos are allowed, so some were skipped.`);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  const files = picked.filter((f) => f.type.startsWith('image/'));
+  if (!files.length) return setError('Choose image files such as JPG or PNG.');
+  setError('');
+
+  const room = MAX_IMAGES - form.images.length;
+  if (room <= 0) return setError(`You can add up to ${MAX_IMAGES} photos.`);
+
+  const selected = files.slice(0, room);
+  const tooBig = selected.find((f) => f.size > MAX_FILE_SIZE);
+  if (tooBig) return setError(`${tooBig.name} is over the 10 MB limit.`);
+
+  try {
+    setBusy(true);
+    const added = await Promise.all(selected.map((f) => compressImage(f)));
+    setForm((prev) => ({ ...prev, images: [...prev.images, ...added] }));
+    if (files.length > room) setError(`Only ${MAX_IMAGES} photos are allowed, so some were skipped.`);
+  } catch (err) {
+    setError(err.message || 'Could not process the images.');
+  } finally {
+    setBusy(false);
+  }
+};
 
   const handleFiles = (e) => {
     const picked = Array.from(e.target.files ?? []);
