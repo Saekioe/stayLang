@@ -139,7 +139,7 @@ export default function HostManagement() {
       <Dialog open={Boolean(selected)} onClose={() => !busy && setSelected(null)} fullWidth maxWidth="md">
         {selected && (
           <>
-            <DialogTitle>Host application: {selected.fullName}</DialogTitle>
+            <DialogTitle sx={{ color: '#0F4A5F', fontWeight: 600 }}>Host application: {selected.fullName}</DialogTitle>
             <DialogContent dividers>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, columnGap: 3 }}>
                 <Box>

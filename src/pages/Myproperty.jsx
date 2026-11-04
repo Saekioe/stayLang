@@ -610,19 +610,23 @@ export default function MyProperty() {
       </Box>
     );
   }
-
-  const view = mode === 'list' && autoCreate && ready && properties.length === 0 ? 'create' : mode;
+  const formOpen = mode !== 'list' || (autoCreate && ready && properties.length === 0);
   const pending = reservations.filter((r) => r.status === 'pending').length;
   const firstName = profile?.firstName || user.displayName || '';
 
+  const startCreate = () => {
+  setEditing(null);
+  setMode('create');
+  };
   const startEdit = (p) => {
     setEditing(p);
     setMode('edit');
   };
-  const backToList = () => {
-    setEditing(null);
+  const closeForm = () => {
     setMode('list');
     setAutoCreate(false);
+    // `editing` is cleared after the close animation (see the Dialog), so the form
+    // doesn't flash back to an empty "create" form while it fades out.
   };
 
   // A listing with upcoming bookings (pending requests or confirmed stays that have
@@ -702,29 +706,20 @@ export default function MyProperty() {
       <Box sx={{ maxWidth: '100%', mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-        {!ready && view === 'list' && (
+        {!ready &&(
           <Box sx={{ py: 8, textAlign: 'center' }}><CircularProgress /></Box>
         )}
 
-        {(view === 'create' || view === 'edit') && (
-          <ListingForm
-            key={editing?.id ?? 'new'}
-            initial={view === 'edit' ? editing : null}
-            onDone={backToList}
-            onCancel={properties.length > 0 ? backToList : undefined}
-          />
-        )}
-
-        {view === 'list' && ready && (
+        {ready && (
           <>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 3 }}>
               <Box>
                 <Typography sx={{ color: '#7A7070', fontWeight: 600, textAlign: 'left' }}>StayLang Host</Typography>
                 <Typography
                   component="h1"
-                  sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1, mt: 0.5 }}
+                  sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1, mt: 0.5, textAlign: 'left' }}
                 >
-                  {firstName ? `Welcome back, ${firstName}` : 'Your properties'}
+                  {firstName ? `Manage your properties` : 'Your properties'}
                 </Typography>
                 <Typography sx={{ color: '#7A7070', mt: 1, textAlign: 'left' }}>
                   Manage your places and see who is coming to stay.
@@ -733,7 +728,7 @@ export default function MyProperty() {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => setMode('create')}
+                onClick={startCreate}
                 sx={{ borderRadius: '10px', px: 2.5, boxShadow: '0 4px 12px rgba(69,123,145,.3)' }}
               >
                 Add property
@@ -800,7 +795,7 @@ export default function MyProperty() {
                         title="No properties yet"
                         text="Add your first place. It goes live for guests as soon as you publish it."
                         action={
-                          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setMode('create')}>
+                          <Button variant="contained" startIcon={<AddIcon />} onClick={startCreate}>
                             Add property
                           </Button>
                         }
@@ -849,6 +844,38 @@ export default function MyProperty() {
           </>
         )}
       </Box>
+
+        <Dialog
+          open={formOpen}
+          onClose={(_, reason) => {
+            // Clicking the backdrop would throw away a half-filled form, so only Esc and Cancel close it.
+            if (reason !== 'backdropClick') closeForm();
+          }}
+          scroll="body"
+          maxWidth={false}
+          aria-label={editing ? 'Edit listing' : 'Create listing'}
+          slotProps={{
+            paper: {
+              sx: {
+                width: '100%',
+                maxWidth: 960,
+                m: { xs: 1, md: 4 },
+                bgcolor: 'transparent',
+                boxShadow: 'none',
+                backgroundImage: 'none',
+                overflow: 'visible',
+              },
+            },
+            transition: { onExited: () => setEditing(null) },
+          }}
+        >
+          <ListingForm
+            key={editing?.id ?? 'new'}
+            initial={editing}
+            onDone={closeForm}
+            onCancel={closeForm}
+          />
+        </Dialog>
 
       <Dialog open={Boolean(replying)} onClose={closeReply} fullWidth maxWidth="sm" aria-labelledby="reply-title">
         <DialogTitle id="reply-title" sx={{ textAlign: 'left' }}>

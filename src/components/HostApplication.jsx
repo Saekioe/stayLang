@@ -159,7 +159,7 @@ export default function HostApplication({ application }) {
     return (
       <Box sx={{ ...cardSx, textAlign: 'center', py: 7 }}>
         <Typography sx={{ color: '#7A7070', fontWeight: 600 }}>StayLang Host</Typography>
-        <Typography component="h1" sx={{ fontSize: '2rem', fontWeight: 600, mt: 0.5, mb: 1 }}>
+        <Typography component="h1" sx={{ fontSize: '2rem', fontWeight: 600, mt: 0.5, mb: 1, color: '#0F4A5F' }}>
           Application under review
         </Typography>
         <Typography sx={{ color: '#7A7070', maxWidth: 460, mx: 'auto' }}>
