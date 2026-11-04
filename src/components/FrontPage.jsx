@@ -93,7 +93,6 @@ export default function FrontPage() {
                   py: 0.75,
                   flexShrink: 0,
                   whiteSpace: 'nowrap',
-                  fontFamily: labelFont,
                   '&:hover': { bgcolor: '#F5E8A3' },
                 }}
               >
