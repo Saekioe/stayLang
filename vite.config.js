@@ -8,4 +8,8 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  server: {
+    // Payment calls go to the local API (server/dev-server.js).
+    proxy: { '/api': 'http://localhost:3001' },
+  },
 })

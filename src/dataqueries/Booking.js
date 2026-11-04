@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   collection, doc, getDocs, onSnapshot, query, serverTimestamp, where, writeBatch,
 } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { auth, db } from '../firebase/firebase';
 
 /* ---------- currency ---------- */
 
@@ -242,3 +242,43 @@ export async function cancelReservation(r, by) {
   );
   await batch.commit();
 }
+
+/* ---------- payment (Stripe, through the /api functions) ---------- */
+
+export const PAYMENT_LABELS = {
+  unpaid: 'Awaiting payment',
+  paid: 'Paid',
+  refunded: 'Refunded',
+  failed: 'Payment failed',
+};
+
+// Reservations made before payments existed have no paymentStatus.
+export const paymentStatusOf = (r) => r.paymentStatus ?? 'unpaid';
+
+// "card" -> "Card", "gcash" -> "Gcash"
+export const paymentMethodLabel = (r) => {
+  if (!r.paymentMethod) return '';
+  const name = r.paymentMethod.charAt(0).toUpperCase() + r.paymentMethod.slice(1);
+  return r.paymentLast4 ? `${name} ending ${r.paymentLast4}` : name;
+};
+
+async function callApi(path, body) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`/api/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+  return data;
+}
+
+// Sends the guest to Stripe's payment page. They come back to My bookings afterwards.
+export async function startCheckout(reservation) {
+  const { url } = await callApi('create-checkout-session', { reservationId: reservation.id });
+  window.location.assign(url);
+}
+
+// Full refund for a cancelled booking that was paid.
+export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });

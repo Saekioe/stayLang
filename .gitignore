@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Firebase Admin key for the local payment API - never commit
+serviceAccountKey.json

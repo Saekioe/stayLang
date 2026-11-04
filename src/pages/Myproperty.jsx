@@ -19,7 +19,8 @@ import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
 import AvailabilityCalendar from '../components/AvailabilityCalendar';
 import {
-  STATUS_LABELS, cancelReservation, confirmReservation, declineReservation, hostPayout, money, statusOf, todayISO,
+  PAYMENT_LABELS, STATUS_LABELS, cancelReservation, confirmReservation, declineReservation, hostPayout, money,
+  paymentStatusOf, refundReservation, statusOf, todayISO,
 } from '../dataqueries/Booking';
 import HostApplication from '../components/HostApplication';
 import { useHostApplication } from '../dataqueries/Host';
@@ -353,7 +354,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
   );
 }
 
-function RequestRow({ r, review, onStatus, onCancel, onReply }) {
+function RequestRow({ r, review, conflict, onStatus, onCancel, onReply }) {
   const pending = r.status === 'pending';
   const placed = r.createdAt?.toDate
     ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -393,6 +394,16 @@ function RequestRow({ r, review, onStatus, onCancel, onReply }) {
           <Typography variant="body2" sx={{ color: '#7A7070' }}>
             {plural(r.guests ?? 1, 'guest')}, {money(r.total)} total{placed ? `, requested ${placed}` : ''}
           </Typography>
+          {(r.status === 'confirmed' || paymentStatusOf(r) !== 'unpaid') && (
+            <Typography variant="body2" sx={{ fontWeight: 600, color: paymentStatusOf(r) === 'unpaid' ? '#6B5200' : '#2E6B3F' }}>
+              {PAYMENT_LABELS[paymentStatusOf(r)]}
+            </Typography>
+          )}
+          {pending && conflict && (
+            <Typography variant="body2" sx={{ color: '#8A2E26', fontWeight: 600 }}>
+              These dates are already booked by another guest. You can only decline this request.
+            </Typography>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -404,7 +415,7 @@ function RequestRow({ r, review, onStatus, onCancel, onReply }) {
           )}
           {pending && (
             <>
-              <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} onClick={() => onStatus(r, 'confirmed')}>
+              <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} disabled={conflict} onClick={() => onStatus(r, 'confirmed')}>
                 Confirm
               </Button>
               <Button size="small" color="inherit" startIcon={<CloseIcon />} onClick={() => onStatus(r, 'declined')}>
@@ -671,8 +682,30 @@ export default function MyProperty() {
       await cancelReservation(r, 'host');
     } catch {
       setError('Could not cancel that booking. Please try again.');
+      return;
+    }
+    // A paid booking is refunded in full when the host cancels it.
+    if (paymentStatusOf(r) === 'paid') {
+      try {
+        await refundReservation(r);
+      } catch {
+        setError('The booking was cancelled, but the refund could not be processed. The guest can retry it from My bookings.');
+      }
     }
   };
+
+  // A pending request is in conflict once another request for the same place and
+  // overlapping dates has been confirmed. Pending requests never block each other.
+  const hasConflict = (r) =>
+    r.status === 'pending' &&
+    reservations.some(
+      (o) =>
+        o.id !== r.id &&
+        o.propertyId === r.propertyId &&
+        o.status === 'confirmed' &&
+        o.checkIn < r.checkOut &&
+        o.checkOut > r.checkIn
+    );
 
   const requestsFor = (id) => reservations.filter((r) => r.propertyId === id && r.status === 'pending').length;
   const reviewsByReservation = Object.fromEntries(reviews.map((rv) => [rv.id, rv]));
@@ -827,6 +860,7 @@ export default function MyProperty() {
                           key={r.id}
                           r={r}
                           review={reviewsByReservation[r.id]}
+                          conflict={hasConflict(r)}
                           onStatus={setStatus}
                           onCancel={cancelBooking}
                           onReply={openReply}

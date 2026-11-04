@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, Navigate } from 'react-router-dom';
+import { Link as RouterLink, Navigate, useSearchParams } from 'react-router-dom';
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, Paper, Rating, Tab, Tabs, TextField, Typography,
@@ -10,7 +10,9 @@ import {
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
-import { cancelReservation, money, statusOf, todayISO } from '../dataqueries/Booking';
+import {
+  PAYMENT_LABELS, cancelReservation, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf, todayISO,
+} from '../dataqueries/Booking';
 
 // Set to true to let guests review only after their check-out date has passed.
 const ONLY_AFTER_CHECKOUT = true;
@@ -83,6 +85,9 @@ export default function MyBookings() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [cancellingId, setCancellingId] = useState('');
+  const [payingId, setPayingId] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paymentResult = searchParams.get('payment'); // set by Stripe when the guest comes back
 
   // history filter and details dialog
   const [tab, setTab] = useState('all');
@@ -144,15 +149,46 @@ export default function MyBookings() {
   const canCancel = (b) => (b.status === 'pending' || b.status === 'confirmed') && b.checkIn > todayISO();
 
   const cancelBooking = async (b) => {
-    if (!window.confirm(`Cancel your booking at "${b.propertyTitle}"?`)) return;
+    if (!window.confirm(`Cancel your booking at "${b.propertyTitle}"?${paymentStatusOf(b) === 'paid' ? ' You will get a full refund.' : ''}`)) return;
     setError('');
     setCancellingId(b.id);
     try {
       await cancelReservation(b, 'guest');
     } catch {
       setError('We could not cancel that booking. Please try again.');
-    } finally {
       setCancellingId('');
+      return;
+    }
+    if (paymentStatusOf(b) === 'paid') {
+      try {
+        await refundReservation(b);
+      } catch {
+        setError('Your booking was cancelled, but the refund could not be processed yet. Use "Retry refund" on the booking.');
+      }
+    }
+    setCancellingId('');
+  };
+
+  const payNow = async (b) => {
+    setError('');
+    setPayingId(b.id);
+    try {
+      await startCheckout(b); // leaves this page for Stripe
+    } catch (err) {
+      setError(err.message);
+      setPayingId('');
+    }
+  };
+
+  const retryRefund = async (b) => {
+    setError('');
+    setPayingId(b.id);
+    try {
+      await refundReservation(b);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPayingId('');
     }
   };
 
@@ -236,6 +272,16 @@ export default function MyBookings() {
           View reservation history and details, and leave reviews for your stays.
         </Typography>
 
+        {paymentResult === 'success' && (
+          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSearchParams({}, { replace: true })}>
+            Thank you! Your payment went through. It can take a few seconds to show as Paid.
+          </Alert>
+        )}
+        {paymentResult === 'cancelled' && (
+          <Alert severity="info" sx={{ mb: 2 }} onClose={() => setSearchParams({}, { replace: true })}>
+            Payment was cancelled. You have not been charged. You can pay again at any time.
+          </Alert>
+        )}
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
@@ -306,6 +352,23 @@ export default function MyBookings() {
                           Cancelled by {b.cancelledBy === 'host' ? 'the host' : 'you'}.
                         </Typography>
                       )}
+                      {b.status === 'confirmed' && (
+                        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: paymentStatusOf(b) === 'paid' ? '#2E6B3F' : '#6B5200' }}>
+                          Payment: {PAYMENT_LABELS[paymentStatusOf(b)]}
+                          {paymentStatusOf(b) === 'paid' && paymentMethodLabel(b) ? ` (${paymentMethodLabel(b)})` : ''}
+                        </Typography>
+                      )}
+                      {b.status === 'cancelled' && paymentStatusOf(b) === 'refunded' && (
+                        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: '#2E6B3F' }}>
+                          Your payment was refunded.
+                        </Typography>
+                      )}
+                      {b.status === 'cancelled' && paymentStatusOf(b) === 'paid' && (
+                        <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#6B5200' }}>Refund pending.</Typography>
+                          <Button size="small" disabled={payingId === b.id} onClick={() => retryRefund(b)}>Retry refund</Button>
+                        </Box>
+                      )}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Chip label={info.label} sx={{ fontWeight: 600, ...info.sx }} />
@@ -315,6 +378,11 @@ export default function MyBookings() {
                       {canCancel(b) && (
                         <Button size="small" color="inherit" disabled={cancellingId === b.id} onClick={() => cancelBooking(b)}>
                           {cancellingId === b.id ? 'Cancelling…' : 'Cancel booking'}
+                        </Button>
+                      )}
+                      {b.status === 'confirmed' && paymentStatusOf(b) !== 'paid' && b.checkOut >= todayISO() && (
+                        <Button size="small" variant="contained" disableElevation disabled={payingId === b.id} onClick={() => payNow(b)}>
+                          {payingId === b.id ? 'Opening…' : 'Pay now'}
                         </Button>
                       )}
                     </Box>
@@ -384,6 +452,14 @@ export default function MyBookings() {
               {cleaning > 0 && <Line label="Cleaning fee" value={money(cleaning)} />}
               {service > 0 && <Line label="Service fee" value={money(service)} />}
               <Line label="Total" value={money(current.total)} bold />
+              {(current.status === 'confirmed' || paymentStatusOf(current) !== 'unpaid') && (
+                <Line
+                  label="Payment"
+                  value={`${PAYMENT_LABELS[paymentStatusOf(current)]}${
+                    paymentStatusOf(current) === 'paid' && paymentMethodLabel(current) ? ` (${paymentMethodLabel(current)})` : ''
+                  }`}
+                />
+              )}
 
               <Divider sx={{ my: 1.5 }} />
               <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Booking info</Typography>
