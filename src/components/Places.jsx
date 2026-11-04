@@ -29,6 +29,8 @@ export function PlaceCard({ place, onSelect }) {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
         textAlign: 'left',
       }}
     >
@@ -37,7 +39,7 @@ export function PlaceCard({ place, onSelect }) {
         aria-label={`View ${place.name}`}
         sx={{
           position: 'relative',
-          width: '100%',
+          width: '90%',
           aspectRatio: '1.28',
           borderRadius: '12px',
           overflow: 'hidden',
@@ -53,7 +55,7 @@ export function PlaceCard({ place, onSelect }) {
       >
         <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.15)' }} />
       </ButtonBase>
-      <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between' }}>
+      <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between', textAlign: 'left', width: '90%' }}>
         <Typography
           sx={{
             fontWeight: 700,
@@ -63,6 +65,7 @@ export function PlaceCard({ place, onSelect }) {
             WebkitLineClamp: 1,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
+            ml: 0.85,
           }}
         >
           {place.name}
@@ -73,8 +76,6 @@ export function PlaceCard({ place, onSelect }) {
             color: 'text.secondary',
             display: 'flex',
             alignItems: 'center',
-            gap: 0.5,
-            mt: 0.25,
           }}
         >
           <LocationOnIcon fontSize="small" />

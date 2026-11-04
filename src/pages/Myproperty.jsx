@@ -21,6 +21,8 @@ import AvailabilityCalendar from '../components/AvailabilityCalendar';
 import {
   STATUS_LABELS, cancelReservation, confirmReservation, declineReservation, hostPayout, money, statusOf, todayISO,
 } from '../dataqueries/Booking';
+import HostApplication from '../components/HostApplication';
+import { useHostApplication } from '../dataqueries/Host';
 
 const statusStyle = {
   pending: { bgcolor: '#FBF1C0', color: '#6B5200' },
@@ -541,6 +543,7 @@ function ReviewsPanel({ properties, reviews, onReply }) {
 export default function MyProperty() {
   const { user, profile, loading } = useAuth();
   const uid = user?.uid;
+  const { application, status: hostStatus, loading: hostLoading } = useHostApplication(uid);
 
   const [properties, setProperties] = useState([]);
   const [reservations, setReservations] = useState([]);
@@ -591,10 +594,22 @@ export default function MyProperty() {
     };
   }, [uid]);
 
-  if (loading) {
+  if (loading || hostLoading) {
     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
   }
   if (!user) return <Navigate to="/login" replace />;
+
+  // Not approved yet: show the application (or the "under review" screen) instead of the listing tools.
+  if (hostStatus !== 'approved') {
+    return (
+      <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
+        <NavigationBar />
+        <Box sx={{ maxWidth: '100%', mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
+          <HostApplication application={application} />
+        </Box>
+      </Box>
+    );
+  }
 
   const view = mode === 'list' && autoCreate && ready && properties.length === 0 ? 'create' : mode;
   const pending = reservations.filter((r) => r.status === 'pending').length;
@@ -682,9 +697,9 @@ export default function MyProperty() {
   };
 
   return (
-    <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
+    <Box sx={{ bgcolor: '#fff', minHeight: '100vh', }}>
       <NavigationBar />
-      <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
+      <Box sx={{ maxWidth: '100%', mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
         {!ready && view === 'list' && (
