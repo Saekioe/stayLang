@@ -107,6 +107,19 @@ export default function NavigationBar() {
           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
             {loading ? null : user ? (
               <>
+                <Button component={RouterLink} to="/my-property" variant="outlined" sx={{ borderRadius: '20px', fontSize: '0.8rem', px: 2, py: 0.5, mr: 1, borderColor: '#457B91', color: '#feffff', bgcolor: '#457B91', '&:hover': { bgcolor: '#F4F4F4', color: '#0F4A5F' } }}>
+                  {hostLabel}
+                </Button>
+                  <IconButton
+                    component={RouterLink}
+                    to="/notifications"
+                    color="inherit"
+                    aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+                  >
+                      <Badge badgeContent={unread} color="error" max={99}>
+                        <NotificationsIcon />
+                      </Badge>
+                  </IconButton>
                 <Button
                   color="inherit"
                   onClick={(e) => setAnchorEl(e.currentTarget)}
