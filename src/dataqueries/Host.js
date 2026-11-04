@@ -4,20 +4,38 @@ import { db } from '../firebase/firebase';
 
 // Live status of the current user's host application.
 // status: 'none' | 'pending' | 'approved' | 'rejected'
+// blocked: true if Firestore never answered (for example an ad blocker is stopping it)
 export function useHostApplication(uid) {
-  const [state, setState] = useState({ application: null, loading: true });
+  const [state, setState] = useState({ application: null, loading: true, blocked: false });
 
   useEffect(() => {
     if (!uid) {
-      setState({ application: null, loading: false });
+      setState({ application: null, loading: false, blocked: false });
       return undefined;
     }
-    setState((s) => ({ ...s, loading: true }));
-    return onSnapshot(
+    setState((s) => ({ ...s, loading: true, blocked: false }));
+
+    // If Firestore never answers, stop the loading state after 8 seconds.
+    const timer = setTimeout(() => {
+      setState((s) => (s.loading ? { ...s, loading: false, blocked: true } : s));
+    }, 8000);
+
+    const unsub = onSnapshot(
       doc(db, 'hostApplications', uid),
-      (snap) => setState({ application: snap.exists() ? snap.data() : null, loading: false }),
-      () => setState({ application: null, loading: false })
+      (snap) => {
+        clearTimeout(timer);
+        setState({ application: snap.exists() ? snap.data() : null, loading: false, blocked: false });
+      },
+      () => {
+        clearTimeout(timer);
+        setState({ application: null, loading: false, blocked: false });
+      }
     );
+
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
   }, [uid]);
 
   return { ...state, status: state.application?.status ?? 'none' };
