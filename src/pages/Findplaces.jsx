@@ -84,10 +84,10 @@ export default function FindPlaces() {
           aria-hidden="true"
           sx={{
             position: 'absolute',
-            top: { xs: 56, md: 44 },
+            top: { xs: 56, md: 0 },
             left: 0,
             right: 0,
-            height: { xs: 440, md: 300 },
+            height: { xs: 440, md: 350 },
             bgcolor: '#213f30',
             borderRadius: '0 0 50% 50% / 0 0 100% 100%',
             zIndex: 0,

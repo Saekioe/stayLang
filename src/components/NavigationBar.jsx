@@ -53,8 +53,9 @@ export default function NavigationBar() {
 
   return (
     <>
-      <AppBar id="home" position="fixed" elevation={0} sx={{ backgroundColor: '#ffffff', color: '#42403d' }}>
-        <Toolbar sx={{ px: { xs: 1, md: 6 }, minHeight: 72, borderBottom: '0.1px solid #d6d6d6' }}>
+      <AppBar id="home" position="fixed" elevation={0} sx={{ backgroundColor: '#ffffff00', color: '#42403d' }}>
+        <Toolbar sx={{ px: { xs: 1, md: 6 }, minHeight: 72,  }}>
+          <Box sx={{ display: 'flex', alignItems: 'center',  bgcolor: 'white', px: 2, borderRadius: 10, py: 1, boxShadow: '0 1px 10px rgba(0,0,0,0.1)' }}>
           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
             <IconButton
               color="inherit"
@@ -79,7 +80,10 @@ export default function NavigationBar() {
               StayLang
             </Typography>
           </Box>
-
+          </Box>
+          
+          
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', ml: { xs: 0, md: 9 }, bgcolor: 'white', px: 2, borderRadius: 10, py: 0.5, boxShadow: '0 1px 10px rgba(0,0,0,0.1)', py: 1 }}>
           <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, textShadow: '0 1px 10px rgba(0,0,0,0.1)' }}>
             {navLinks.map(({ label, to }) => (
               <Button
@@ -147,7 +151,8 @@ export default function NavigationBar() {
                     {displayName}
                   </Typography>
                 </Button>
-
+                
+                  
                 <Menu
                   id="account-menu"
                   anchorEl={anchorEl}
@@ -181,6 +186,7 @@ export default function NavigationBar() {
                     <ListItemText>Logout</ListItemText>
                   </MenuItem>
                 </Menu>
+                
               </>
             ) : (
               <>
@@ -206,6 +212,7 @@ export default function NavigationBar() {
                 </Button>
               </>
             )}
+          </Box>
           </Box>
         </Toolbar>
 
