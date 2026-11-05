@@ -11,7 +11,7 @@ import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import {
-  PAYMENT_LABELS, cancelReservation, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf, todayISO,
+  PAYMENT_LABELS, cancelReservation, confirmPayment, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf, todayISO,
 } from '../dataqueries/Booking';
 
 // Set to true to let guests review only after their check-out date has passed.
@@ -138,6 +138,14 @@ export default function MyBookings() {
     [bookings]
   );
 
+  // Back from Stripe: do not wait for the webhook. Ask the server to check the payment now.
+  useEffect(() => {
+    if (paymentResult !== 'success' || !ready) return;
+    bookings
+      .filter((b) => b.status === 'confirmed' && paymentStatusOf(b) === 'unpaid')
+      .forEach((b) => confirmPayment(b).catch(() => {}));
+  }, [paymentResult, ready]);
+
   if (loading) {
     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
   }
@@ -176,6 +184,20 @@ export default function MyBookings() {
       await startCheckout(b); // leaves this page for Stripe
     } catch (err) {
       setError(err.message);
+      setPayingId('');
+    }
+  };
+
+  // For a booking that was paid but still shows "Awaiting payment".
+  const refreshPayment = async (b) => {
+    setError('');
+    setPayingId(b.id);
+    try {
+      const status = await confirmPayment(b);
+      if (status === 'unpaid') setError('We could not find a completed payment for this booking yet.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setPayingId('');
     }
   };
@@ -383,6 +405,11 @@ export default function MyBookings() {
                       {b.status === 'confirmed' && paymentStatusOf(b) !== 'paid' && b.checkOut >= todayISO() && (
                         <Button size="small" variant="contained" disableElevation disabled={payingId === b.id} onClick={() => payNow(b)}>
                           {payingId === b.id ? 'Opening…' : 'Pay now'}
+                        </Button>
+                      )}
+                      {b.status === 'confirmed' && paymentStatusOf(b) === 'unpaid' && (
+                        <Button size="small" color="inherit" disabled={payingId === b.id} onClick={() => refreshPayment(b)}>
+                          Already paid? Refresh
                         </Button>
                       )}
                     </Box>

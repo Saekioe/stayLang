@@ -1,0 +1,287 @@
+diff --git a/api/confirm-payment.js b/api/confirm-payment.js
+new file mode 100644
+index 0000000..0654600
+--- /dev/null
++++ b/api/confirm-payment.js
+@@ -0,0 +1,29 @@
++// POST /api/confirm-payment   body: { reservationId }
++// Asks Stripe directly whether this booking was paid, and updates it if so.
++// The webhook normally does this; this is the backup for when the webhook did not arrive.
++import { db, json, requireUser } from '../server/shared.js';
++import { findPaidSessionId, markPaid } from '../server/payments.js';
++
++export async function POST(request) {
++  const user = await requireUser(request);
++  if (!user) return json({ error: 'Please log in again.' }, 401);
++
++  const { reservationId } = await request.json().catch(() => ({}));
++  if (!reservationId) return json({ error: 'Missing reservation.' }, 400);
++
++  const snap = await db.collection('reservations').doc(reservationId).get();
++  if (!snap.exists) return json({ error: 'Booking not found.' }, 404);
++  const r = snap.data();
++  if (r.guestId !== user.uid) return json({ error: 'This is not your booking.' }, 403);
++
++  if (r.paymentStatus === 'paid' || r.paymentStatus === 'refunded') return json({ status: r.paymentStatus });
++
++  try {
++    const sessionId = await findPaidSessionId(reservationId);
++    if (!sessionId) return json({ status: 'unpaid' });
++    return json({ status: await markPaid(sessionId) });
++  } catch (err) {
++    console.error('[confirm-payment] failed:', err);
++    return json({ error: 'Could not check the payment with Stripe.' }, 502);
++  }
++}
+diff --git a/api/stripe-webhook.js b/api/stripe-webhook.js
+index 790bcba..4fac1e3 100644
+--- a/api/stripe-webhook.js
++++ b/api/stripe-webhook.js
+@@ -1,47 +1,7 @@
+ // POST /api/stripe-webhook   (called by Stripe, not by the browser)
+ // When Stripe says a Checkout payment succeeded, mark the reservation as paid.
+-import { FieldValue, db, json, notification, stripe } from '../server/shared.js';
+-
+-async function markPaid(sessionId) {
+-  const session = await stripe.checkout.sessions.retrieve(sessionId, {
+-    expand: ['payment_intent.latest_charge'],
+-  });
+-  if (session.payment_status !== 'paid') return;
+-
+-  const reservationId = session.client_reference_id;
+-  if (!reservationId) return;
+-  const ref = db.collection('reservations').doc(reservationId);
+-  const snap = await ref.get();
+-  if (!snap.exists) return;
+-  const r = { id: snap.id, ...snap.data() };
+-  if (r.paymentStatus === 'paid' || r.paymentStatus === 'refunded') return; // Stripe may resend events
+-
+-  const intent = session.payment_intent;
+-  const details = intent?.latest_charge?.payment_method_details;
+-  const paidFields = {
+-    paymentMethod: details?.type ?? 'card',
+-    paymentBrand: details?.card?.brand ?? null,
+-    paymentLast4: details?.card?.last4 ?? null,
+-    stripeSessionId: session.id,
+-    stripePaymentIntentId: intent?.id ?? null,
+-    amountPaid: (session.amount_total ?? 0) / 100,
+-  };
+-
+-  // The booking was cancelled while the guest was paying: give the money back.
+-  if (r.status !== 'confirmed') {
+-    if (intent?.id) {
+-      await stripe.refunds.create({ payment_intent: intent.id }, { idempotencyKey: `refund-${reservationId}` });
+-    }
+-    await ref.update({ ...paidFields, paymentStatus: 'refunded', refundedAt: FieldValue.serverTimestamp() });
+-    return;
+-  }
+-
+-  const batch = db.batch();
+-  batch.update(ref, { ...paidFields, paymentStatus: 'paid', paidAt: FieldValue.serverTimestamp() });
+-  batch.set(db.collection('notifications').doc(), notification(r, r.guestId, 'payment_confirmed'));
+-  batch.set(db.collection('notifications').doc(), notification(r, r.ownerId, 'payment_received'));
+-  await batch.commit();
+-}
++import { db, json, stripe } from '../server/shared.js';
++import { markPaid } from '../server/payments.js';
+ 
+ async function markFailed(sessionId) {
+   const session = await stripe.checkout.sessions.retrieve(sessionId);
+@@ -58,10 +18,12 @@ export async function POST(request) {
+   let event;
+   try {
+     event = stripe.webhooks.constructEvent(raw, request.headers.get('stripe-signature'), process.env.STRIPE_WEBHOOK_SECRET);
+-  } catch {
++  } catch (err) {
++    console.error('[webhook] signature check failed. STRIPE_WEBHOOK_SECRET must match the whsec_ printed by "stripe listen":', err.message);
+     return json({ error: 'Invalid signature.' }, 400);
+   }
+ 
++  console.log(`[webhook] ${event.type}`);
+   try {
+     switch (event.type) {
+       case 'checkout.session.completed':
+@@ -74,8 +36,9 @@ export async function POST(request) {
+       default:
+         break;
+     }
+-  } catch {
++  } catch (err) {
++    console.error(`[webhook] could not process ${event.type}:`, err);
+     return json({ error: 'Could not process the event.' }, 500); // Stripe will retry
+   }
+   return json({ received: true });
+-}
+\ No newline at end of file
++}
+diff --git a/server/dev-server.js b/server/dev-server.js
+index 1b17bbe..874ccea 100644
+--- a/server/dev-server.js
++++ b/server/dev-server.js
+@@ -12,6 +12,7 @@ const routes = {
+   '/api/create-checkout-session': () => import('../api/create-checkout-session.js'),
+   '/api/stripe-webhook': () => import('../api/stripe-webhook.js'),
+   '/api/refund-reservation': () => import('../api/refund-reservation.js'),
++  '/api/confirm-payment': () => import('../api/confirm-payment.js'),
+ };
+ 
+ // Only the headers the functions read are passed on.
+@@ -56,4 +57,4 @@ createServer(async (req, res) => {
+   console.log(`API ready on http://localhost:${PORT}`);
+   console.log('Forward Stripe webhooks with:');
+   console.log(`  stripe listen --forward-to localhost:${PORT}/api/stripe-webhook`);
+-});
+\ No newline at end of file
++});
+diff --git a/server/payments.js b/server/payments.js
+new file mode 100644
+index 0000000..7f5c62a
+--- /dev/null
++++ b/server/payments.js
+@@ -0,0 +1,69 @@
++// Marks reservations as paid. Used by the Stripe webhook and by /api/confirm-payment,
++// so a missed webhook never leaves a paid booking stuck as "unpaid".
++import { FieldValue, db, notification, stripe } from './shared.js';
++
++// Returns 'paid', 'refunded' or 'unpaid'. Safe to call many times for the same session.
++export async function markPaid(sessionId) {
++  const session = await stripe.checkout.sessions.retrieve(sessionId, {
++    expand: ['payment_intent.latest_charge'],
++  });
++  if (session.payment_status !== 'paid') {
++    console.log(`[payments] ${sessionId} is not paid yet (${session.payment_status})`);
++    return 'unpaid';
++  }
++
++  const reservationId = session.client_reference_id;
++  if (!reservationId) {
++    console.log(`[payments] ${sessionId} has no reservation id`);
++    return 'unpaid';
++  }
++  const ref = db.collection('reservations').doc(reservationId);
++  const snap = await ref.get();
++  if (!snap.exists) {
++    console.log(`[payments] reservation ${reservationId} not found`);
++    return 'unpaid';
++  }
++  const r = { id: snap.id, ...snap.data() };
++  if (r.paymentStatus === 'paid' || r.paymentStatus === 'refunded') {
++    console.log(`[payments] reservation ${reservationId} already ${r.paymentStatus}`);
++    return r.paymentStatus;
++  }
++
++  const intent = session.payment_intent;
++  const details = intent?.latest_charge?.payment_method_details;
++  const paidFields = {
++    paymentMethod: details?.type ?? 'card',
++    paymentBrand: details?.card?.brand ?? null,
++    paymentLast4: details?.card?.last4 ?? null,
++    stripeSessionId: session.id,
++    stripePaymentIntentId: intent?.id ?? null,
++    amountPaid: (session.amount_total ?? 0) / 100,
++  };
++
++  // The booking was cancelled while the guest was paying: give the money back.
++  if (r.status !== 'confirmed') {
++    if (intent?.id) {
++      await stripe.refunds.create({ payment_intent: intent.id }, { idempotencyKey: `refund-${reservationId}` });
++    }
++    await ref.update({ ...paidFields, paymentStatus: 'refunded', refundedAt: FieldValue.serverTimestamp() });
++    console.log(`[payments] reservation ${reservationId} was ${r.status}, so the payment was refunded`);
++    return 'refunded';
++  }
++
++  const batch = db.batch();
++  batch.update(ref, { ...paidFields, paymentStatus: 'paid', paidAt: FieldValue.serverTimestamp() });
++  batch.set(db.collection('notifications').doc(), notification(r, r.guestId, 'payment_confirmed'));
++  batch.set(db.collection('notifications').doc(), notification(r, r.ownerId, 'payment_received'));
++  await batch.commit();
++  console.log(`[payments] reservation ${reservationId} marked paid`);
++  return 'paid';
++}
++
++// Looks through recent Checkout sessions for a paid one that belongs to this reservation.
++export async function findPaidSessionId(reservationId) {
++  const sessions = await stripe.checkout.sessions.list({ limit: 100 });
++  const match = sessions.data.find(
++    (s) => s.client_reference_id === reservationId && s.payment_status === 'paid'
++  );
++  return match?.id ?? null;
++}
+diff --git a/src/dataqueries/Booking.js b/src/dataqueries/Booking.js
+index bfd824c..5da5ed5 100644
+--- a/src/dataqueries/Booking.js
++++ b/src/dataqueries/Booking.js
+@@ -281,4 +281,9 @@ export async function startCheckout(reservation) {
+ }
+ 
+ // Full refund for a cancelled booking that was paid.
+-export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });
+\ No newline at end of file
++export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });
++
++// Asks the server to check with Stripe whether this booking was paid, and update it.
++// Returns 'paid', 'refunded' or 'unpaid'.
++export const confirmPayment = async (reservation) =>
++  (await callApi('confirm-payment', { reservationId: reservation.id })).status;
+diff --git a/src/pages/MyBookings.jsx b/src/pages/MyBookings.jsx
+index d13c396..86ae462 100644
+--- a/src/pages/MyBookings.jsx
++++ b/src/pages/MyBookings.jsx
+@@ -11,7 +11,7 @@ import { db } from '../firebase/firebase';
+ import { useAuth } from '../auth/Auth';
+ import NavigationBar from '../components/NavigationBar';
+ import {
+-  PAYMENT_LABELS, cancelReservation, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf, todayISO,
++  PAYMENT_LABELS, cancelReservation, confirmPayment, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf, todayISO,
+ } from '../dataqueries/Booking';
+ 
+ // Set to true to let guests review only after their check-out date has passed.
+@@ -138,6 +138,14 @@ export default function MyBookings() {
+     [bookings]
+   );
+ 
++  // Back from Stripe: do not wait for the webhook. Ask the server to check the payment now.
++  useEffect(() => {
++    if (paymentResult !== 'success' || !ready) return;
++    bookings
++      .filter((b) => b.status === 'confirmed' && paymentStatusOf(b) === 'unpaid')
++      .forEach((b) => confirmPayment(b).catch(() => {}));
++  }, [paymentResult, ready]);
++
+   if (loading) {
+     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
+   }
+@@ -180,6 +188,20 @@ export default function MyBookings() {
+     }
+   };
+ 
++  // For a booking that was paid but still shows "Awaiting payment".
++  const refreshPayment = async (b) => {
++    setError('');
++    setPayingId(b.id);
++    try {
++      const status = await confirmPayment(b);
++      if (status === 'unpaid') setError('We could not find a completed payment for this booking yet.');
++    } catch (err) {
++      setError(err.message);
++    } finally {
++      setPayingId('');
++    }
++  };
++
+   const retryRefund = async (b) => {
+     setError('');
+     setPayingId(b.id);
+@@ -385,6 +407,11 @@ export default function MyBookings() {
+                           {payingId === b.id ? 'Opening…' : 'Pay now'}
+                         </Button>
+                       )}
++                      {b.status === 'confirmed' && paymentStatusOf(b) === 'unpaid' && (
++                        <Button size="small" color="inherit" disabled={payingId === b.id} onClick={() => refreshPayment(b)}>
++                          Already paid? Refresh
++                        </Button>
++                      )}
+                     </Box>
+                   </Box>
+ 

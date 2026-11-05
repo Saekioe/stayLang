@@ -282,3 +282,8 @@ export async function startCheckout(reservation) {
 
 // Full refund for a cancelled booking that was paid.
 export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });
+
+// Asks the server to check with Stripe whether this booking was paid, and update it.
+// Returns 'paid', 'refunded' or 'unpaid'.
+export const confirmPayment = async (reservation) =>
+  (await callApi('confirm-payment', { reservationId: reservation.id })).status;
