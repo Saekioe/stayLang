@@ -10,9 +10,14 @@ import {
 import {
   Alert,
   Avatar,
-  // Badge,
   Box,
+  Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -29,7 +34,6 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlined";
 import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-// import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import MenuIcon from "@mui/icons-material/Menu";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -182,6 +186,7 @@ function SidebarContent({ isActive, onNavigate, onLogout }) {
       >
         {menuItems.map(({ label, path, Icon }) => {
           const active = isActive(path);
+
           return (
             <ListItemButton
               key={label}
@@ -219,8 +224,16 @@ function SidebarContent({ isActive, onNavigate, onLogout }) {
 
       {/* Footer */}
       <Divider sx={{ mx: 2 }} />
+
       <Box sx={{ px: 2, py: 2 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1.5 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1.25,
+            mb: 1.5,
+          }}
+        >
           <Avatar sx={{ ...avatarSx, width: 32, height: 32 }}>AD</Avatar>
           <Box>
             <Typography
@@ -238,6 +251,7 @@ function SidebarContent({ isActive, onNavigate, onLogout }) {
             </Typography>
           </Box>
         </Box>
+
         <ListItemButton
           onClick={onLogout}
           sx={{ borderRadius: "10px", px: 1, gap: 1.5, color: "#4A5560" }}
@@ -256,7 +270,13 @@ export default function AdminDashboard() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Logout confirmation state
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   // Firestore collections (used by the Overview)
   const [users, setUsers] = useState([]);
@@ -300,14 +320,33 @@ export default function AdminDashboard() {
 
   const isActive = (path) =>
     path === BASE ? pathname === BASE : pathname.startsWith(path);
+
   const current = menuItems.find((m) => isActive(m.path)) ?? menuItems[0];
 
-  const handleLogout = async () => {
+  const openLogoutDialog = () => {
+    setLogoutError("");
+    setLogoutDialogOpen(true);
+  };
+
+  const closeLogoutDialog = () => {
+    if (logoutLoading) return;
+    setLogoutDialogOpen(false);
+    setLogoutError("");
+  };
+
+  const confirmLogout = async () => {
+    setLogoutLoading(true);
+    setLogoutError("");
+
     try {
-      if (logout) await logout();
+      await logout();
+      setLogoutDialogOpen(false);
       navigate("/login");
-    } catch {
-      setError("Failed to log out.");
+    } catch (err) {
+      console.error("Admin logout failed:", err);
+      setLogoutError("Failed to log out. Please try again.");
+    } finally {
+      setLogoutLoading(false);
     }
   };
 
@@ -319,6 +358,7 @@ export default function AdminDashboard() {
       </Box>
     );
   }
+
   if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
     return <Navigate to="/login" replace />;
   }
@@ -347,7 +387,7 @@ export default function AdminDashboard() {
           zIndex: 10,
         }}
       >
-        <SidebarContent isActive={isActive} onLogout={handleLogout} />
+        <SidebarContent isActive={isActive} onLogout={openLogoutDialog} />
       </Box>
 
       {/* Mobile sidebar */}
@@ -360,7 +400,10 @@ export default function AdminDashboard() {
         <SidebarContent
           isActive={isActive}
           onNavigate={() => setMobileOpen(false)}
-          onLogout={handleLogout}
+          onLogout={() => {
+            setMobileOpen(false);
+            openLogoutDialog();
+          }}
         />
       </Drawer>
 
@@ -395,10 +438,13 @@ export default function AdminDashboard() {
             >
               <MenuIcon />
             </IconButton>
+
             <Typography sx={{ fontSize: 13, color: colors.muted }}>
               Admin workspace
             </Typography>
+
             <ChevronRightIcon sx={{ fontSize: 16, color: colors.muted }} />
+
             <Typography
               sx={{ fontSize: 13, color: colors.title, fontWeight: 500 }}
             >
@@ -431,6 +477,7 @@ export default function AdminDashboard() {
               {error}
             </Alert>
           )}
+
           <Routes>
             <Route
               index
@@ -453,6 +500,55 @@ export default function AdminDashboard() {
           </Routes>
         </Box>
       </Box>
+
+      {/* Admin logout confirmation dialog */}
+      <Dialog
+        open={logoutDialogOpen}
+        onClose={closeLogoutDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            color: "#1F2937",
+            bgcolor: "#FFFFFF",
+          }}
+        >
+          Log out of StayLang Admin?
+        </DialogTitle>
+
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to log out of the administrator account?
+          </DialogContentText>
+
+          {logoutError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {logoutError}
+            </Alert>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={closeLogoutDialog}
+            disabled={logoutLoading}
+            color="inherit"
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={confirmLogout}
+            disabled={logoutLoading}
+            variant="contained"
+            color="error"
+          >
+            {logoutLoading ? "Logging out..." : "Log out"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

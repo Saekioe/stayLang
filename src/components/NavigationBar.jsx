@@ -1,86 +1,167 @@
-import { useState } from 'react';
-import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { useState } from "react";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  AppBar, Toolbar, Typography, Button, Box, IconButton, Avatar, Badge, Divider,
-  Drawer, List, ListItemButton, ListItemText, ListItemIcon, Menu, MenuItem,
-} from '@mui/material';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import EventNoteIcon from '@mui/icons-material/EventNote';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import MenuIcon from '@mui/icons-material/Menu';
-import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
-import { useAuth } from '../auth/Auth';
-import LogoutIcon from '@mui/icons-material/Logout';
-import { useNotifications } from '../dataqueries/Data';
-import EditProfile from './EditProfile';
-import logo from '../assets/logo.png';
-import { useHostApplication } from '../dataqueries/Host';
-
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  IconButton,
+  Avatar,
+  Badge,
+  Divider,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemText,
+  ListItemIcon,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Alert,
+} from "@mui/material";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import EventNoteIcon from "@mui/icons-material/EventNote";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import MenuIcon from "@mui/icons-material/Menu";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import LogoutIcon from "@mui/icons-material/Logout";
+import { useAuth } from "../auth/Auth";
+import { useNotifications } from "../dataqueries/Data";
+import EditProfile from "./EditProfile";
+import logo from "../assets/logo.png";
+import { useHostApplication } from "../dataqueries/Host";
 
 const navLinks = [
-  { label: 'Home', to: '/' },
-  { label: 'Deals', to: '/#about' },
-  { label: 'Find Places', to: '/places' },
+  { label: "Home", to: "/" },
+  { label: "Deals", to: "/#about" },
+  { label: "Find Places", to: "/places" },
 ];
-
-
 
 export default function NavigationBar() {
   const { user, profile, loading, logout } = useAuth();
   const { unread } = useNotifications(user?.uid);
-  const [active, setActive] = useState('Home');
+  const [active, setActive] = useState("Home");
   const { pathname } = useLocation();
-  const current = pathname === '/places' ? 'Find Places' : active;
+  const navigate = useNavigate();
+  const current = pathname === "/places" ? "Find Places" : active;
+
   const [open, setOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const menuOpen = Boolean(anchorEl);
   const closeMenu = () => setAnchorEl(null);
-  // near the top of the component, after the other hooks
-
-  const { status: hostStatus } = useHostApplication(user?.uid);
-  const hostLabel = {
-  none: 'Apply as a Host',
-  pending: 'Application pending',
-  rejected: 'Reapply as a Host',
-  approved: 'My Property',
-}[hostStatus] ?? 'Apply as a Host';
 
   const [editOpen, setEditOpen] = useState(false);
 
+  // Logout confirmation state
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+
+  const { status: hostStatus } = useHostApplication(user?.uid);
+
+  const hostLabel =
+    {
+      none: "Apply as a Host",
+      pending: "Application pending",
+      rejected: "Reapply as a Host",
+      approved: "My Property",
+    }[hostStatus] ?? "Apply as a Host";
+
   const displayName =
-    profile?.firstName || user?.displayName || user?.email?.split('@')[0] || '';
-  const fullName = profile ? `${profile.firstName} ${profile.lastName}` : displayName;
+    profile?.firstName || user?.displayName || user?.email?.split("@")[0] || "";
+
+  const fullName = profile
+    ? `${profile.firstName} ${profile.lastName}`
+    : displayName;
+
+  const openLogoutDialog = () => {
+    closeMenu();
+    setLogoutError("");
+    setLogoutDialogOpen(true);
+  };
+
+  const closeLogoutDialog = () => {
+    if (logoutLoading) return;
+    setLogoutDialogOpen(false);
+    setLogoutError("");
+  };
+
+  const confirmLogout = async () => {
+    setLogoutLoading(true);
+    setLogoutError("");
+
+    try {
+      await logout();
+      navigate("/login");
+      setLogoutDialogOpen(false);
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setLogoutError("We could not log you out. Please try again.");
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
 
   return (
     <>
-      <AppBar id="home" position="fixed" elevation={0} sx={{ backgroundColor: '#ffffff', color: '#42403d' }}>
-        <Toolbar sx={{ px: { xs: 1, md: 6 }, minHeight: 72, borderBottom: '0.1px solid #d6d6d6' }}>
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+      <AppBar
+        id="home"
+        position="fixed"
+        elevation={0}
+        sx={{ backgroundColor: "#ffffff", color: "#42403d" }}
+      >
+        <Toolbar
+          sx={{
+            px: { xs: 1, md: 6 },
+            minHeight: 72,
+            borderBottom: "0.1px solid #d6d6d6",
+          }}
+        >
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center" }}>
             <IconButton
               color="inherit"
               aria-label="Open menu"
               onClick={() => setOpen(true)}
-              sx={{ display: { md: 'none' }, mr: 0.5 }}
+              sx={{ display: { md: "none" }, mr: 0.5 }}
             >
               <MenuIcon />
             </IconButton>
+
             <Box
               component="img"
               src={logo}
               alt="StayLang Logo"
               sx={{ height: 35, ml: 1.25 }}
             />
+
             <Typography
               variant="h6"
               component={RouterLink}
               to="/"
-              sx={{ fontWeight: 'bold', color: '#0f4a5f', textDecoration: 'none', fontSize: '1.1rem', ml: 1 }}
+              sx={{
+                fontWeight: "bold",
+                color: "#0f4a5f",
+                textDecoration: "none",
+                fontSize: "1.1rem",
+                ml: 1,
+              }}
             >
               StayLang
             </Typography>
           </Box>
 
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, textShadow: '0 1px 10px rgba(0,0,0,0.1)' }}>
+          <Box
+            sx={{
+              display: { xs: "none", md: "flex" },
+              gap: 2,
+              textShadow: "0 1px 10px rgba(0,0,0,0.1)",
+            }}
+          >
             {navLinks.map(({ label, to }) => (
               <Button
                 key={label}
@@ -91,7 +172,7 @@ export default function NavigationBar() {
                 onClick={() => setActive(label)}
                 sx={{
                   fontWeight: 600,
-                  textDecoration: current === label ? 'underline' : 'none',
+                  textDecoration: current === label ? "underline" : "none",
                   textUnderlineOffset: 4,
                 }}
               >
@@ -100,50 +181,88 @@ export default function NavigationBar() {
             ))}
           </Box>
 
-          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
-                    {!loading && (
-                      <Button
-                        component={RouterLink}
-                        to="/my-property"
-                        variant="outlined"
-                        sx={{ borderRadius: '20px', fontSize: '0.8rem', px: 2, py: 0.5, mr: 1, borderColor: '#457B91', color: '#feffff', bgcolor: '#457B91', '&:hover': { bgcolor: '#F4F4F4', color: '#0F4A5F' } }}
-                      >
-                        {user ? hostLabel : 'Apply as a Host'}
-                      </Button>
-                    )}
-                    {loading ? null : user ? (
-                      <>
-                  <IconButton
-                    component={RouterLink}
-                    to="/notifications"
-                    color="inherit"
-                    aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-                  >
-                      <Badge badgeContent={unread} color="error" max={99}>
-                        <NotificationsIcon />
-                      </Badge>
-                  </IconButton>
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            {!loading && (
+              <Button
+                component={RouterLink}
+                to="/my-property"
+                variant="outlined"
+                sx={{
+                  borderRadius: "20px",
+                  fontSize: "0.8rem",
+                  px: 2,
+                  py: 0.5,
+                  mr: 1,
+                  borderColor: "#457B91",
+                  color: "#feffff",
+                  bgcolor: "#457B91",
+                  "&:hover": { bgcolor: "#F4F4F4", color: "#0F4A5F" },
+                }}
+              >
+                {user ? hostLabel : "Apply as a Host"}
+              </Button>
+            )}
+
+            {loading ? null : user ? (
+              <>
+                <IconButton
+                  component={RouterLink}
+                  to="/notifications"
+                  color="inherit"
+                  aria-label={
+                    unread ? `Notifications, ${unread} unread` : "Notifications"
+                  }
+                >
+                  <Badge badgeContent={unread} color="error" max={99}>
+                    <NotificationsIcon />
+                  </Badge>
+                </IconButton>
+
                 <Button
                   color="inherit"
                   onClick={(e) => setAnchorEl(e.currentTarget)}
                   aria-haspopup="menu"
-                  aria-expanded={menuOpen ? 'true' : undefined}
-                  aria-controls={menuOpen ? 'account-menu' : undefined}
-                  aria-label={unread ? `Account menu, ${unread} unread messages` : 'Account menu'}
+                  aria-expanded={menuOpen ? "true" : undefined}
+                  aria-controls={menuOpen ? "account-menu" : undefined}
+                  aria-label={
+                    unread
+                      ? `Account menu, ${unread} unread messages`
+                      : "Account menu"
+                  }
                   endIcon={<KeyboardArrowDownIcon />}
                   sx={{
                     borderRadius: 99,
                     pl: 0.75,
                     pr: 1.5,
                     py: 0.5,
-                    border: '1px solid #d6d6d6',
-                    '&:hover': { bgcolor: '#F4F4F4' },
+                    border: "1px solid #d6d6d6",
+                    "&:hover": { bgcolor: "#F4F4F4" },
                   }}
-                >  
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
-                      
-                    </Avatar>
-                  <Typography variant="body2" sx={{ fontWeight: 600, ml: 1, display: { xs: 'none', sm: 'block' } }}>
+                >
+                  <Avatar
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      bgcolor: "primary.main",
+                      fontSize: "0.8rem",
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      ml: 1,
+                      display: { xs: "none", sm: "block" },
+                    }}
+                  >
                     {displayName}
                   </Typography>
                 </Button>
@@ -153,40 +272,73 @@ export default function NavigationBar() {
                   anchorEl={anchorEl}
                   open={menuOpen}
                   onClose={closeMenu}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                  slotProps={{ paper: { sx: { mt: 1, minWidth: 240, borderRadius: '12px' } } }}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                  transformOrigin={{ vertical: "top", horizontal: "right" }}
+                  slotProps={{
+                    paper: {
+                      sx: { mt: 1, minWidth: 240, borderRadius: "12px" },
+                    },
+                  }}
                 >
-                  <Box sx={{ px: 2, py: 1.25, textAlign: 'left' }}>
-                    <Typography sx={{ fontWeight: 700 }} noWrap>{fullName}</Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{user.email}</Typography>
+                  <Box sx={{ px: 2, py: 1.25, textAlign: "left" }}>
+                    <Typography sx={{ fontWeight: 700 }} noWrap>
+                      {fullName}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                      noWrap
+                    >
+                      {user.email}
+                    </Typography>
                   </Box>
+
                   <Divider />
-                  <MenuItem component={RouterLink} to="/my-bookings" onClick={closeMenu}>
-                    <ListItemIcon><EventNoteIcon fontSize="small" /></ListItemIcon>
+
+                  <MenuItem
+                    component={RouterLink}
+                    to="/my-bookings"
+                    onClick={closeMenu}
+                  >
+                    <ListItemIcon>
+                      <EventNoteIcon fontSize="small" />
+                    </ListItemIcon>
                     <ListItemText>My bookings</ListItemText>
                   </MenuItem>
-                  <MenuItem onClick={() => { closeMenu(); setEditOpen(true); }}>
-                    <ListItemIcon><ManageAccountsIcon fontSize="small" /></ListItemIcon>
-                    <ListItemText>Edit profile</ListItemText>
-                  </MenuItem>
-                  <Divider />
+
                   <MenuItem
                     onClick={() => {
                       closeMenu();
-                      logout();
+                      setEditOpen(true);
                     }}
                   >
-                    <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+                    <ListItemIcon>
+                      <ManageAccountsIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Edit profile</ListItemText>
+                  </MenuItem>
+
+                  <Divider />
+
+                  <MenuItem onClick={openLogoutDialog}>
+                    <ListItemIcon>
+                      <LogoutIcon fontSize="small" />
+                    </ListItemIcon>
                     <ListItemText>Logout</ListItemText>
                   </MenuItem>
                 </Menu>
               </>
             ) : (
               <>
-                <Button color="inherit" size="small" component={RouterLink} to="/login" >
+                <Button
+                  color="inherit"
+                  size="small"
+                  component={RouterLink}
+                  to="/login"
+                >
                   Login
                 </Button>
+
                 <Button
                   variant="contained"
                   disableElevation
@@ -194,12 +346,12 @@ export default function NavigationBar() {
                   component={RouterLink}
                   to="/signup"
                   sx={{
-                    display: { xs: 'none', sm: 'inline-flex' },
-                    bgcolor: '#F8F5C5',
-                    color: 'text.primary',
+                    display: { xs: "none", sm: "inline-flex" },
+                    bgcolor: "#F8F5C5",
+                    color: "text.primary",
                     borderRadius: 99,
                     px: 2,
-                    '&:hover': { bgcolor: '#f9ee5e' },
+                    "&:hover": { bgcolor: "#f9ee5e" },
                   }}
                 >
                   Sign up
@@ -228,8 +380,61 @@ export default function NavigationBar() {
         </Drawer>
       </AppBar>
 
-      {/* External Edit Profile Modal Component */}
-      <EditProfile open={editOpen} onClose={() => setEditOpen(false)} user={user} profile={profile} />
+      {/* Logout confirmation dialog */}
+      <Dialog
+        open={logoutDialogOpen}
+        onClose={closeLogoutDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            color: "#1F2937",
+            bgcolor: "#FFFFFF",
+          }}
+        >
+          Log out of StayLang?
+        </DialogTitle>
+
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to log out of your account?
+          </DialogContentText>
+
+          {logoutError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {logoutError}
+            </Alert>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={closeLogoutDialog}
+            disabled={logoutLoading}
+            color="inherit"
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={confirmLogout}
+            disabled={logoutLoading}
+            variant="contained"
+            color="error"
+          >
+            {logoutLoading ? "Logging out..." : "Log out"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <EditProfile
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        user={user}
+        profile={profile}
+      />
     </>
   );
 }
