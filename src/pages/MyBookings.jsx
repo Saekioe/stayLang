@@ -148,6 +148,15 @@ export default function MyBookings() {
   // A guest can cancel a pending or confirmed booking until the day of check-in.
   const canCancel = (b) => (b.status === 'pending' || b.status === 'confirmed') && b.checkIn > todayISO();
 
+  const guestSummary = (b) => {
+  const adults = b.adults ?? b.guests ?? 1;
+  const parts = [plural(adults, 'adult')];
+  if (b.children) parts.push(`${b.children} ${b.children === 1 ? 'child' : 'children'}`);
+  if (b.infants) parts.push(plural(b.infants, 'infant'));
+  if (b.pets) parts.push(plural(b.pets, 'pet'));
+  return parts.join(', ');
+};
+
   const cancelBooking = async (b) => {
     if (!window.confirm(`Cancel your booking at "${b.propertyTitle}"?${paymentStatusOf(b) === 'paid' ? ' You will get a full refund.' : ''}`)) return;
     setError('');
@@ -345,7 +354,7 @@ export default function MyBookings() {
                         {fmt(b.checkIn)} to {fmt(b.checkOut)}, {plural(b.nights ?? 0, 'night')}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#7A7070' }}>
-                        {plural(b.guests ?? 1, 'guest')}, {money(b.total)} total
+                        {guestSummary(b)}, {money(b.total)} total
                       </Typography>
                       {b.status === 'cancelled' && (
                         <Typography variant="body2" sx={{ color: '#8A2E26', mt: 0.5 }}>
@@ -441,7 +450,7 @@ export default function MyBookings() {
               <Line label="Check-in" value={fmt(current.checkIn)} />
               <Line label="Check-out" value={fmt(current.checkOut)} />
               <Line label="Nights" value={current.nights ?? 0} />
-              <Line label="Guests" value={current.guests ?? 1} />
+              <Line label="Guests" value={guestSummary(current)} />
 
               <Divider sx={{ my: 1.5 }} />
               <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Price</Typography>

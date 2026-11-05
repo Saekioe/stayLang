@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -8,11 +7,8 @@ import {
   Avatar,
   Box,
   Button,
-  ButtonBase,
   Dialog,
   IconButton,
-  MenuItem,
-  TextField,
   Typography,
   Collapse,
 } from '@mui/material';
@@ -24,7 +20,6 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import PeopleIcon from '@mui/icons-material/People';
 import BedIcon from '@mui/icons-material/Bed';
 import BathtubIcon from '@mui/icons-material/Bathtub';
@@ -34,6 +29,8 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CreditCardOutlinedIcon from '@mui/icons-material/CreditCardOutlined';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import RemoveIcon from '@mui/icons-material/Remove';
+import AddIcon from '@mui/icons-material/Add';
 
 import {
   addDoc,
@@ -71,18 +68,52 @@ const addDays = (iso, n) => {
   return toISODate(date);
 };
 
+// One row of the guest picker: label, age hint, and a - / + stepper
+function GuestCounter({ label, hint, value, min = 0, canAdd, onChange }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1 }}>
+      <Box>
+        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>{label}</Typography>
+        <Typography sx={{ fontSize: '0.75rem', color: '#777777' }}>{hint}</Typography>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <IconButton
+          size="small"
+          aria-label={`Fewer ${label}`}
+          disabled={value <= min}
+          onClick={() => onChange(-1)}
+          sx={{ border: '1px solid #CBD5E1' }}
+        >
+          <RemoveIcon fontSize="small" />
+        </IconButton>
+        <Typography sx={{ minWidth: 18, textAlign: 'center' }}>{value}</Typography>
+        <IconButton
+          size="small"
+          aria-label={`More ${label}`}
+          disabled={!canAdd}
+          onClick={() => onChange(1)}
+          sx={{ border: '1px solid #CBD5E1' }}
+        >
+          <AddIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    </Box>
+  );
+}
+
 function Details({ place, onClose }) {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
 
   const [saved, setSaved] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
-  const [fullscreen, setFullscreen] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
-  const [guests, setGuests] = useState(1);
+
+  // Guest classification: adults (13+), children (2-12), infants (under 2), pets
+  const [party, setParty] = useState({ adults: 1, children: 0, infants: 0, pets: 0 });
 
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -113,6 +144,22 @@ function Details({ place, onClose }) {
     cleaningFee: place.cleaningFee,
     serviceFeePercent,
   });
+
+  // Limits set by the host. Older listings only have `capacity`, so they fall back to it.
+  const capacity = place.capacity || 1;
+  const limits = {
+    adults: Math.min(place.maxAdults ?? capacity, capacity),
+    children: Math.min(place.maxChildren ?? capacity, capacity),
+    infants: place.maxInfants ?? 0,
+    pets: place.petsAllowed ? place.maxPets ?? 1 : 0,
+  };
+  // Infants and pets don't take up a guest spot
+  const countedGuests = party.adults + party.children;
+  const canAdd = (key) =>
+    party[key] < limits[key] &&
+    (key === 'infants' || key === 'pets' || countedGuests < capacity);
+  const changeParty = (key, delta) =>
+    setParty((p) => ({ ...p, [key]: p[key] + delta }));
 
   const minCheckout = checkIn ? addDays(checkIn, 1) : today;
 
@@ -198,6 +245,14 @@ function Details({ place, onClose }) {
       return;
     }
 
+    if (countedGuests > capacity) {
+      setNotice({
+        severity: 'error',
+        text: `This place fits up to ${plural(capacity, 'guest')} (adults and children).`,
+      });
+      return;
+    }
+
     if (
       nightsBetween(checkIn, checkOut).some((date) =>
         bookedNights.includes(date)
@@ -256,7 +311,13 @@ function Details({ place, onClose }) {
         checkIn,
         checkOut,
         nights,
-        guests,
+
+        // `guests` is adults + children, so older screens and capacity checks keep working
+        guests: countedGuests,
+        adults: party.adults,
+        children: party.children,
+        infants: party.infants,
+        pets: party.pets,
 
         nightlyRate: quote.nightlyRate,
         subtotal: quote.subtotal,
@@ -770,26 +831,56 @@ function Details({ place, onClose }) {
               }}
             />
 
-            <TextField
-              select
-              fullWidth
-              size="medium"
-              label="Guests"
-              value={guests}
-              onChange={(event) =>
-                setGuests(Number(event.target.value))
-              }
-              sx={{ gridColumn: { sm: '1 / -1' } }}
+            {/* GUESTS: adults, children, infants, pets */}
+            <Box
+              sx={{
+                gridColumn: { sm: '1 / -1' },
+                border: '1px solid #E2E8F0',
+                borderRadius: 1,
+                px: 2,
+              }}
             >
-              {Array.from(
-                { length: Math.min(place.capacity || 1, 10) },
-                (_, index) => index + 1
-              ).map((number) => (
-                <MenuItem key={number} value={number}>
-                  {plural(number, 'guest')}
-                </MenuItem>
-              ))}
-            </TextField>
+              <GuestCounter
+                label="Adults"
+                hint="Age 13 and up"
+                value={party.adults}
+                min={1}
+                canAdd={canAdd('adults')}
+                onChange={(d) => changeParty('adults', d)}
+              />
+              <GuestCounter
+                label="Children"
+                hint="Ages 2 to 12"
+                value={party.children}
+                canAdd={canAdd('children')}
+                onChange={(d) => changeParty('children', d)}
+              />
+              {limits.infants > 0 && (
+                <GuestCounter
+                  label="Infants"
+                  hint="Under 2 (not counted as guests)"
+                  value={party.infants}
+                  canAdd={canAdd('infants')}
+                  onChange={(d) => changeParty('infants', d)}
+                />
+              )}
+              {limits.pets > 0 ? (
+                <GuestCounter
+                  label="Pets"
+                  hint={`Up to ${limits.pets} allowed`}
+                  value={party.pets}
+                  canAdd={canAdd('pets')}
+                  onChange={(d) => changeParty('pets', d)}
+                />
+              ) : (
+                <Typography sx={{ fontSize: '0.75rem', color: '#777777', py: 1 }}>
+                  Pets are not allowed here.
+                </Typography>
+              )}
+              <Typography sx={{ fontSize: '0.72rem', color: '#777777', pb: 1 }}>
+                This place fits up to {plural(capacity, 'guest')} (adults and children).
+              </Typography>
+            </Box>
           </Box>
 
           {/* Price and book button */}

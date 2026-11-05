@@ -35,6 +35,16 @@ const statusStyle = {
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+// "2 adults, 1 child, 1 infant, 1 pet". Older reservations only have `guests`.
+const guestSummary = (r) => {
+  const adults = r.adults ?? r.guests ?? 1;
+  const parts = [plural(adults, 'adult')];
+  if (r.children) parts.push(`${r.children} ${r.children === 1 ? 'child' : 'children'}`);
+  if (r.infants) parts.push(plural(r.infants, 'infant'));
+  if (r.pets) parts.push(plural(r.pets, 'pet'));
+  return parts.join(', ');
+};
+
 const fmt = (d) =>
   new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -215,7 +225,7 @@ function Dashboard({ properties, reservations, reviews }) {
                   {r.propertyTitle}
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#7A7070' }}>
-                  {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.guests ?? 1, 'guest')}
+                  {fmt(r.checkIn)} to {fmt(r.checkOut)}, {guestSummary(r)}
                 </Typography>
               </Box>
             ))
@@ -279,6 +289,11 @@ function EmptyState({ title, text, action }) {
 }
 
 function PropertyRow({ p, newRequests, onEdit, onDelete }) {
+  // Listings created before verification existed have no verificationStatus and count as verified
+  const underReview = p.verificationStatus === 'pending';
+  const rejected = p.verificationStatus === 'rejected';
+  const hiddenByAdmin = !underReview && !rejected && p.published === false;
+
   return (
     <Box
       sx={{
@@ -318,6 +333,15 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
           {newRequests > 0 && (
             <Chip size="small" label={plural(newRequests, 'new request')} sx={{ bgcolor: '#FBF1C0', color: '#6B5200', fontWeight: 600 }} />
           )}
+          {underReview && (
+            <Chip size="small" label="Under review" sx={{ bgcolor: '#FBF1C0', color: '#6B5200', fontWeight: 600 }} />
+          )}
+          {rejected && (
+            <Chip size="small" label="Not approved" sx={{ bgcolor: '#F8E1DF', color: '#8A2E26', fontWeight: 600 }} />
+          )}
+          {hiddenByAdmin && (
+            <Chip size="small" label="Hidden by admin" sx={{ bgcolor: '#EFECEC', color: '#7A7070', fontWeight: 600 }} />
+          )}
         </Box>
         <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.25, textAlign: 'left' }} noWrap>
           {[p.city, p.type].filter(Boolean).join(', ')}
@@ -325,6 +349,16 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
         <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.25, textAlign: 'left' }} noWrap>
           {plural(p.bedrooms ?? 0, 'bedroom')}, {plural(p.beds ?? 0, 'bed')}, {plural(p.baths ?? 0, 'bath')}, sleeps {p.capacity ?? 1}
         </Typography>
+        {underReview && (
+          <Typography variant="body2" sx={{ color: '#6B5200', mt: 0.25, textAlign: 'left' }}>
+            Our team is verifying this listing. It will go live once approved.
+          </Typography>
+        )}
+        {rejected && (
+          <Typography variant="body2" sx={{ color: '#8A2E26', mt: 0.25, textAlign: 'left' }}>
+            {p.rejectionReason ? `Reason: ${p.rejectionReason}. ` : ''}Edit the listing and save to resubmit.
+          </Typography>
+        )}
       </Box>
 
       <Box
@@ -343,7 +377,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => onEdit(p)}>
-            Edit
+            {rejected ? 'Fix & resubmit' : 'Edit'}
           </Button>
           <IconButton size="small" aria-label={`Delete ${p.title}`} onClick={() => onDelete(p)}>
             <DeleteOutlineIcon fontSize="small" />
@@ -392,7 +426,7 @@ function RequestRow({ r, review, conflict, onStatus, onCancel, onReply }) {
             {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.nights ?? 0, 'night')}
           </Typography>
           <Typography variant="body2" sx={{ color: '#7A7070' }}>
-            {plural(r.guests ?? 1, 'guest')}, {money(r.total)} total{placed ? `, requested ${placed}` : ''}
+            {guestSummary(r)}, {money(r.total)} total{placed ? `, requested ${placed}` : ''}
           </Typography>
           {(r.status === 'confirmed' || paymentStatusOf(r) !== 'unpaid') && (
             <Typography variant="body2" sx={{ fontWeight: 600, color: paymentStatusOf(r) === 'unpaid' ? '#6B5200' : '#2E6B3F' }}>
@@ -560,6 +594,7 @@ export default function MyProperty() {
   const [reservations, setReservations] = useState([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [mode, setMode] = useState('list'); // 'list' | 'create' | 'edit'
   const [editing, setEditing] = useState(null);
   const [autoCreate, setAutoCreate] = useState(true);
@@ -626,8 +661,8 @@ export default function MyProperty() {
   const firstName = profile?.firstName || user.displayName || '';
 
   const startCreate = () => {
-  setEditing(null);
-  setMode('create');
+    setEditing(null);
+    setMode('create');
   };
   const startEdit = (p) => {
     setEditing(p);
@@ -638,6 +673,16 @@ export default function MyProperty() {
     setAutoCreate(false);
     // `editing` is cleared after the close animation (see the Dialog), so the form
     // doesn't flash back to an empty "create" form while it fades out.
+  };
+  // Called after the form saved successfully
+  const finishForm = () => {
+    if (!editing) {
+      setNotice('Your listing was submitted. Our team will verify it before it goes live. You can track its status under Properties.');
+      setTab(1);
+    } else if (editing.verificationStatus === 'rejected') {
+      setNotice('Your listing was sent back for review.');
+    }
+    closeForm();
   };
 
   // A listing with upcoming bookings (pending requests or confirmed stays that have
@@ -738,6 +783,7 @@ export default function MyProperty() {
       <NavigationBar />
       <Box sx={{ maxWidth: '100%', mx: 'auto', px: { xs: 2, md: 4 }, pt: 12, pb: 12 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+        {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice('')}>{notice}</Alert>}
 
         {!ready &&(
           <Box sx={{ py: 8, textAlign: 'center' }}><CircularProgress /></Box>
@@ -826,7 +872,7 @@ export default function MyProperty() {
                     {properties.length === 0 ? (
                       <EmptyState
                         title="No properties yet"
-                        text="Add your first place. It goes live for guests as soon as you publish it."
+                        text="Add your first place. Our team verifies every new listing, and it goes live for guests once it is approved."
                         action={
                           <Button variant="contained" startIcon={<AddIcon />} onClick={startCreate}>
                             Add property
@@ -906,7 +952,7 @@ export default function MyProperty() {
           <ListingForm
             key={editing?.id ?? 'new'}
             initial={editing}
-            onDone={closeForm}
+            onDone={finishForm}
             onCancel={closeForm}
           />
         </Dialog>

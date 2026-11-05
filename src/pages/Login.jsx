@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Divider, Typography } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import PersonIcon from '@mui/icons-material/Person';
-import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase/firebase';
+import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/firebase';
 import { useAuth, authMessage, resolveEmail } from '../auth/Auth';
 import { Field, AuthCard } from '../components/Authui';
 import bg from '../assets/bg.jpg';
@@ -17,11 +18,15 @@ export default function Login() {
   const { user } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => sessionStorage.getItem('authNotice') || '');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (user) {
+  useEffect(() => {
+    sessionStorage.removeItem('authNotice');
+  }, []);
+
+  if (user && !busy) {
     const userEmail = user.email?.toLowerCase() || '';
     const isAdmin = ADMIN_EMAILS.some((email) => email.toLowerCase() === userEmail);
     return <Navigate to={isAdmin ? '/admin/dashboard' : '/'} replace />;
@@ -38,7 +43,24 @@ export default function Login() {
       if (!email) {
         setError(authMessage('auth/user-not-found'));
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+
+        // The admin may not have a users doc, so skip the check for admin emails
+        const isAdminLogin = ADMIN_EMAILS.some(
+          (a) => a.toLowerCase() === email.toLowerCase()
+        );
+
+        if (!isAdminLogin) {
+          const snap = await getDoc(doc(db, 'users', cred.user.uid));
+          if (!snap.exists()) {
+            await signOut(auth);
+            setError('This account no longer exists.');
+          } else if (snap.data().disabled) {
+            await signOut(auth);
+            const why = snap.data().disabledReason;
+            setError(`Your account is suspended.${why ? ` Reason: ${why}` : ''}`);
+          }
+        }
       }
     } catch (err) {
       setError(authMessage(err.code));
@@ -61,7 +83,6 @@ export default function Login() {
   };
 
   return (
-    
     <AuthCard title="Login">
       <Box component="form" onSubmit={handleLogin} noValidate>
         {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
@@ -104,18 +125,31 @@ export default function Login() {
       </Divider>
 
       <Box sx={{ display: 'grid', gap: 1 }}>
-        <Button fullWidth startIcon={<PersonIcon />} onClick={() => navigate('/')} 
-        sx={{ bgcolor: '#D9D9D9',
-              color: 'text.primary',
-              borderRadius: '8px',
-              '&:hover': { bgcolor: '#CFCFCF' } }}>
+        <Button
+          fullWidth
+          startIcon={<PersonIcon />}
+          onClick={() => navigate('/')}
+          sx={{
+            bgcolor: '#D9D9D9',
+            color: 'text.primary',
+            borderRadius: '8px',
+            '&:hover': { bgcolor: '#CFCFCF' },
+          }}
+        >
           Continue as a guest
         </Button>
-        <Button fullWidth component={RouterLink} to="/signup" startIcon={<PersonAddAltIcon />} 
-        sx={{ bgcolor: '#D9D9D9',
-              color: 'text.primary',
-              borderRadius: '8px',
-              '&:hover': { bgcolor: '#CFCFCF' } }}>
+        <Button
+          fullWidth
+          component={RouterLink}
+          to="/signup"
+          startIcon={<PersonAddAltIcon />}
+          sx={{
+            bgcolor: '#D9D9D9',
+            color: 'text.primary',
+            borderRadius: '8px',
+            '&:hover': { bgcolor: '#CFCFCF' },
+          }}
+        >
           Create an account
         </Button>
       </Box>
