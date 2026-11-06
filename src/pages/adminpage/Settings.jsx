@@ -270,21 +270,6 @@ export default function Settings() {
               helperText="Shown to users, for example on the suspended account message"
             />
 
-            <Box sx={{ border: `1px solid ${colors.line}`, borderRadius: '12px', px: 2, py: 1 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.maintenance}
-                    onChange={(e) => setForm((f) => ({ ...f, maintenance: e.target.checked }))}
-                  />
-                }
-                label="Maintenance mode"
-              />
-              <Typography sx={{ fontSize: 12, color: colors.muted, ml: 6, mt: -0.5 }}>
-                When on, guests and hosts should see a maintenance page. Admins can still log in.
-              </Typography>
-            </Box>
-
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
               <Button disabled={!dirty || busy} onClick={() => { setForm(saved); setFormError(''); }}>
                 Reset
