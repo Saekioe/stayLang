@@ -37,6 +37,7 @@ import { CANCELLATION_TIERS, computeQuote, nightsBetween, nightsCount } from '..
 import { createReservation } from '../dataqueries/Reservation';
 import { useAuth } from '../auth/Auth';
 import { usePropertyReviews } from '../dataqueries/Data';
+import PropertyLocation from './Maps/PropertyLocation';
 
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -486,6 +487,13 @@ function Details({ place, onClose }) {
               <Typography sx={{ fontSize: '0.8rem' }}>
                 {place.location}
               </Typography>
+            </Box>
+          )}
+
+          {/* Map pin set by the host */}
+          {place.lat != null && place.lng != null && (
+            <Box sx={{ mb: 2 }}>
+              <PropertyLocation lat={place.lat} lng={place.lng} title={place.name} />
             </Box>
           )}
 

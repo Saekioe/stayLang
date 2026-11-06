@@ -20,6 +20,8 @@ import {
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import { amenityOptions, usePropertyTypes } from '../dataqueries/Data';
+import { geocodeAddress } from '../dataqueries/Geocode';
+import LocationPicker from './Maps/LocationPicker';
 
 const MAX_IMAGES = 4;
 const MIN_IMAGES = 3;
@@ -82,6 +84,7 @@ function compressImage(file, maxSize = 800, quality = 0.6) {
 const empty = {
   title: '', type: '', placeType: 'Entire place', description: '', hostBio: '',
   street: '', barangay: '', city: '', province: '', postalCode: '',
+  lat: null, lng: null, // map pin
   maxAdults: '', maxChildren: '0', maxInfants: '0', petsAllowed: false, maxPets: '1',
   bedrooms: '', beds: '', baths: '',
   pricePerNight: '', maxStay: '30', cleaningFee: '0',
@@ -96,7 +99,7 @@ const empty = {
 const toNum = (v, fallback = 0) => (v === '' || Number.isNaN(Number(v)) ? fallback : Number(v));
 
 // Returns { tab, message } for the first problem, or null when everything is fine.
-function validate(f, { needsProof }) {
+function validate(f, { needsProof, needsPin }) {
   const bad = (tab, message) => ({ tab, message });
   if (!f.title.trim()) return bad(0, 'Enter a property title.');
   if (!f.type) return bad(0, 'Choose a property type.');
@@ -105,6 +108,9 @@ function validate(f, { needsProof }) {
   if (!f.city.trim()) return bad(0, 'Enter the city.');
   if (!f.province.trim()) return bad(0, 'Enter the province.');
   if (!/^\d{4}$/.test(f.postalCode.trim())) return bad(0, 'Enter a 4-digit postal code.');
+  if (needsPin && (f.lat == null || f.lng == null)) {
+    return bad(0, 'Pin the property on the map: use "Find on map", then drag the pin to the exact spot.');
+  }
   if (!f.description.trim()) return bad(0, 'Add a short description.');
 
   if (!(toNum(f.maxAdults, NaN) >= 1)) return bad(1, 'At least 1 adult must be allowed.');
@@ -196,6 +202,8 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           barangay: initial.barangay ?? '',
           province: initial.province ?? '',
           postalCode: initial.postalCode ?? '',
+          lat: Number.isFinite(initial.lat) ? initial.lat : null,
+          lng: Number.isFinite(initial.lng) ? initial.lng : null,
           maxAdults: String(initial.maxAdults ?? initial.capacity ?? ''),
           maxChildren: String(initial.maxChildren ?? 0),
           maxInfants: String(initial.maxInfants ?? 0),
@@ -228,6 +236,37 @@ export default function ListingForm({ initial, onDone, onCancel }) {
 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locateNote, setLocateNote] = useState('');
+
+  const setPin = (pos) => setForm((f) => ({ ...f, lat: pos.lat, lng: pos.lng }));
+
+  // Address -> pin (OpenStreetMap Nominatim). The host can still drag the pin afterwards.
+  const findOnMap = async () => {
+    if (!form.city.trim() && !form.barangay.trim()) {
+      setLocateNote('Fill in the barangay and city first, or click the map to place the pin.');
+      return;
+    }
+    setLocating(true);
+    setLocateNote('');
+    try {
+      const hit = await geocodeAddress(form);
+      if (!hit) {
+        setLocateNote('We could not find that address. Click the map to place the pin yourself.');
+      } else {
+        setPin(hit);
+        setLocateNote(
+          hit.precise
+            ? 'Pin placed. Drag it to the exact spot if needed.'
+            : 'Found the area, not the exact street. Drag the pin to your property.'
+        );
+      }
+    } catch {
+      setLocateNote('The address search is unavailable right now. Click the map to place the pin yourself.');
+    } finally {
+      setLocating(false);
+    }
+  };
   const [dragging, setDragging] = useState(false);
 
   // A new listing starts on the first category the admin offers.
@@ -305,7 +344,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
   const removeImage = (i) => setForm((f) => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }));
 
   const save = async () => {
-    const problem = validate(form, { needsProof: !isEdit });
+    const problem = validate(form, { needsProof: !isEdit, needsPin: !isEdit });
     if (problem) {
       setActiveTab(problem.tab);
       return setError(problem.message);
@@ -336,6 +375,8 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       city: form.city.trim(),
       province: form.province.trim(),
       postalCode: form.postalCode.trim(),
+      // Map pin (only saved once the host has placed one)
+      ...(form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : {}),
       // Full address string, kept so the rest of the app that reads `location` still works
       location: [form.street, form.barangay, form.city, form.province, form.postalCode]
         .map((s) => s.trim()).filter(Boolean).join(', '),
@@ -520,6 +561,26 @@ export default function ListingForm({ initial, onDone, onCancel }) {
               <FormField label="Province" value={form.province} onChange={set('province')} />
               <FormField label="Postal Code" placeholder="e.g., 1226" value={form.postalCode} onChange={set('postalCode')} htmlInput={{ maxLength: 4, inputMode: 'numeric' }} />
             </Box>
+          </Box>
+
+          <Box sx={cardSx}>
+            <SectionTitle icon={LocationOnIcon} title="Pin on the map" />
+            <Typography sx={hintSx}>
+              Guests see this pin on your listing page. Search your address, then drag the pin to the exact spot,
+              or just click the map.
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
+              <Button variant="outlined" onClick={findOnMap} disabled={locating} sx={{ textTransform: 'none' }}>
+                {locating ? 'Searching…' : 'Find on map'}
+              </Button>
+              {locateNote && (
+                <Typography sx={{ fontSize: '0.85rem', color: '#64748B' }}>{locateNote}</Typography>
+              )}
+            </Box>
+            <LocationPicker
+              initialPosition={form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null}
+              onLocationSelect={setPin}
+            />
           </Box>
         </Box>
       )}

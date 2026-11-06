@@ -65,6 +65,8 @@ export function toPlace(snap) {
     name: d.title,
     city: d.city,
     location: d.location,
+    lat: Number.isFinite(d.lat) ? d.lat : null,
+    lng: Number.isFinite(d.lng) ? d.lng : null,
     type: d.type,
     image: d.images?.[0] ?? '',
     images: d.images ?? [],

@@ -20,3 +20,8 @@
   font-size: 13px;
   color: #666;
 }
+
+/* Smaller map on a listing page */
+.property-map .leaflet-container {
+  height: 280px;
+}

@@ -6,23 +6,12 @@ import {
   TileLayer,
   Marker,
   Popup,
+  useMap,
   useMapEvents
 } from "react-leaflet";
 
-import L from "leaflet";
-
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-import "./Maps.css";
-
-// Fix default Leaflet marker images
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow
-});
+// Leaflet stylesheet, marker images and map sizing
+import "./leafletSetup";
 
 // Default location: Manila
 const DEFAULT_POSITION = {
@@ -43,6 +32,28 @@ function MapClickHandler({ onSelect }) {
       onSelect(position);
     }
   });
+
+  return null;
+}
+
+// Moves the map to the pin when it was set from outside the map (address search)
+// or the map was sized while hidden. Pins inside the current view are left alone.
+function FollowPin({ position }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 250);
+    return () => clearTimeout(t);
+  }, [map]);
+
+  const lat = position?.lat;
+  const lng = position?.lng;
+  useEffect(() => {
+    if (lat == null || lng == null) return;
+    if (!map.getBounds().contains([lat, lng])) {
+      map.setView([lat, lng], Math.max(map.getZoom(), 15));
+    }
+  }, [map, lat, lng]);
 
   return null;
 }
@@ -101,6 +112,7 @@ export default function LocationPicker({
         />
 
         <MapClickHandler onSelect={updatePosition} />
+        <FollowPin position={position} />
 
         {position && (
           <Marker
