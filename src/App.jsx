@@ -4,6 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './font/Theme';
 import { AuthProvider } from './auth/Auth';
+import SuspensionGuard from './auth/SuspensionGuard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import FindPlaces from './pages/Findplaces';
@@ -42,6 +43,7 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
+        <SuspensionGuard />
         <BrowserRouter>
           <ScrollToHash />
           <Routes>

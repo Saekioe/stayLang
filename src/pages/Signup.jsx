@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
-import { Alert, Box, Button, Link, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, Link, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
@@ -22,8 +22,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../firebase/firebase";
-import { useAuth, authMessage } from "../auth/Auth";
-import { Field, AuthCard } from "../components/Authui";
+import { useAuth, authMessage, signInWithGoogle } from "../auth/Auth";
+import { Field, AuthCard, GoogleButton } from "../components/Authui";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
@@ -60,6 +60,19 @@ export default function Signup() {
     setStep(2);
   };
 
+  const handleGoogle = async () => {
+    setError("");
+    setBusy(true);
+    const result = await signInWithGoogle();
+    if (result.error) {
+      setBusy(false);
+      return setError(result.error);
+    }
+    if (result.cancelled) return setBusy(false);
+    if (result.profile) setProfile(result.profile);
+    navigate(result.isAdmin ? "/admin/dashboard" : "/");
+  };
+
   // Step 2: profile, then create everything
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,15 +85,24 @@ export default function Signup() {
       return setError(
         'Username must be 3–20 characters: letters, numbers, "_" or ".".',
       );
-    if (!form.birthday) return setError("Enter your birthday.");
-    if (!form.phone) return setError("Enter your phone number.");
+    if (!form.birthday || !form.birthday.isValid())
+      return setError("Enter a valid birthday.");
+    if (form.birthday.isAfter(dayjs()))
+      return setError("Your birthday can't be in the future.");
+    if (form.phone.replace(/\D/g, "").length < 10)
+      return setError("Enter a valid phone number.");
 
     setError("");
     setBusy(true);
 
     try {
       // Quick pre-check so we don't create an account for a taken username.
-      if ((await getDoc(doc(db, "usernames", username))).exists()) {
+      // If it can't be read while signed out, skip it: the transaction below
+      // is the real check and cleans up the new account if the name is taken.
+      const taken = await getDoc(doc(db, "usernames", username))
+        .then((snap) => snap.exists())
+        .catch(() => false);
+      if (taken) {
         setBusy(false);
         return setError("That username is already taken.");
       }
@@ -178,6 +200,7 @@ export default function Signup() {
               type="submit"
               variant="contained"
               disableElevation
+              disabled={busy}
               endIcon={<ArrowForwardIcon />}
               sx={{
                 display: "flex",
@@ -189,6 +212,15 @@ export default function Signup() {
             >
               Next
             </Button>
+
+            <Divider sx={{ my: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Or
+              </Typography>
+            </Divider>
+            <GoogleButton onClick={handleGoogle} disabled={busy}>
+              Sign up with Google
+            </GoogleButton>
           </Box>
         ) : (
           <Box component="form" onSubmit={handleSubmit} noValidate>

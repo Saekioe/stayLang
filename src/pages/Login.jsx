@@ -7,15 +7,12 @@ import PersonIcon from '@mui/icons-material/Person';
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebase';
-import { useAuth, authMessage, resolveEmail } from '../auth/Auth';
-import { Field, AuthCard } from '../components/Authui';
-import bg from '../assets/bg.jpg';
-
-const ADMIN_EMAILS = ['admin@staylang.com'];
+import { useAuth, authMessage, resolveEmail, isAdminEmail, signInWithGoogle } from '../auth/Auth';
+import { Field, AuthCard, GoogleButton } from '../components/Authui';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, setProfile } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(() => sessionStorage.getItem('authNotice') || '');
@@ -27,9 +24,7 @@ export default function Login() {
   }, []);
 
   if (user && !busy) {
-    const userEmail = user.email?.toLowerCase() || '';
-    const isAdmin = ADMIN_EMAILS.some((email) => email.toLowerCase() === userEmail);
-    return <Navigate to={isAdmin ? '/admin/dashboard' : '/'} replace />;
+    return <Navigate to={isAdminEmail(user.email) ? '/admin/dashboard' : '/'} replace />;
   }
 
   const handleLogin = async (e) => {
@@ -46,11 +41,7 @@ export default function Login() {
         const cred = await signInWithEmailAndPassword(auth, email, password);
 
         // The admin may not have a users doc, so skip the check for admin emails
-        const isAdminLogin = ADMIN_EMAILS.some(
-          (a) => a.toLowerCase() === email.toLowerCase()
-        );
-
-        if (!isAdminLogin) {
+        if (!isAdminEmail(email)) {
           const snap = await getDoc(doc(db, 'users', cred.user.uid));
           if (!snap.exists()) {
             await signOut(auth);
@@ -59,6 +50,8 @@ export default function Login() {
             await signOut(auth);
             const why = snap.data().disabledReason;
             setError(`Your account is suspended.${why ? ` Reason: ${why}` : ''}`);
+          } else {
+            setProfile(snap.data());
           }
         }
       }
@@ -67,6 +60,16 @@ export default function Login() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleGoogle = async () => {
+    setError('');
+    setInfo('');
+    setBusy(true);
+    const result = await signInWithGoogle();
+    if (result.error) setError(result.error);
+    else if (result.profile) setProfile(result.profile);
+    setBusy(false);
   };
 
   const handleForgot = async () => {
@@ -125,6 +128,7 @@ export default function Login() {
       </Divider>
 
       <Box sx={{ display: 'grid', gap: 1 }}>
+        <GoogleButton onClick={handleGoogle} disabled={busy} />
         <Button
           fullWidth
           startIcon={<PersonIcon />}

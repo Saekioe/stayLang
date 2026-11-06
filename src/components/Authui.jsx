@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { Box, Divider, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material';
+import { Box, Button, Divider, IconButton, InputAdornment, Paper, TextField, Typography } from '@mui/material';
+import GoogleIcon from '@mui/icons-material/Google';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import bg from '../assets/bg.jpg';
@@ -50,6 +51,26 @@ export function Field({ label, type = 'text', htmlInput, ...props }) {
         {...props}
       />
     </Box>
+  );
+}
+
+export function GoogleButton({ children = 'Continue with Google', ...props }) {
+  return (
+    <Button
+      fullWidth
+      variant="outlined"
+      startIcon={<GoogleIcon />}
+      sx={{
+        borderRadius: '8px',
+        py: 1,
+        color: 'text.primary',
+        borderColor: '#d9d9d9',
+        '&:hover': { borderColor: '#bdbdbd', bgcolor: '#f5f5f5' },
+      }}
+      {...props}
+    >
+      {children}
+    </Button>
   );
 }
 
