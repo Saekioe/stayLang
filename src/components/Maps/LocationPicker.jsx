@@ -15,7 +15,7 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-import "./Map.css";
+import "./Maps.css";
 
 // Fix default Leaflet marker images
 L.Icon.Default.mergeOptions({

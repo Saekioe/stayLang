@@ -97,14 +97,16 @@ function describe(n) {
     case 'reservation_cancelled': {
       const by = n.cancelledBy;
       let title;
-      if (host) {
+      if (by === 'admin') {
+        title = host ? `An admin cancelled a booking at ${place}` : `An admin cancelled your booking at ${place}`;
+      } else if (host) {
         title = by === 'guest' ? `A guest cancelled their booking at ${place}` : `You cancelled a booking at ${place}`;
       } else {
         title = by === 'host' ? `The host cancelled your booking at ${place}` : `You cancelled your booking at ${place}`;
       }
       return {
         title,
-        body: `${when}. The dates are open for booking again.`,
+        body: `${when}.${by === 'admin' && n.reason ? ` Reason: ${n.reason}.` : ''} The dates are open for booking again.`,
         chip: { label: 'Cancelled', sx: CHIP.red },
         link,
       };

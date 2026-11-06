@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
-import { getAuth } from 'firebase/auth';
 import {
   collection, doc, onSnapshot, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
@@ -263,12 +262,21 @@ export default function ReservationMonitoring() {
       [r.guestId, r.ownerId].filter(Boolean).forEach((userId) => {
         batch.set(doc(collection(db, 'notifications')), {
           userId,
+          // Same shape as the other notifications, so the inbox can describe it properly
+          recipient: userId === r.ownerId ? 'host' : 'guest',
           reservationId: r.id,
+          propertyId: r.propertyId ?? null,
+          propertyTitle: r.propertyTitle ?? '',
+          checkIn: r.checkIn,
+          checkOut: r.checkOut,
+          nights: r.nights || nightsBetween(r.checkIn, r.checkOut),
+          total: r.total ?? 0,
           type: 'reservation_cancelled',
+          cancelledBy: 'admin',
+          reason: reason.trim(),
           message: `Admin cancelled the reservation at ${r.propertyTitle} (${r.checkIn} to ${r.checkOut}). Reason: ${reason.trim()}`,
           read: false,
           createdAt: serverTimestamp(),
-          cancelledBy: getAuth().currentUser?.uid || 'admin',
         });
       });
       await batch.commit();
