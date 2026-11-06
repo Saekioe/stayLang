@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { money } from '../../dataqueries/Booking';
+import { describeCounts, planPropertyRemoval, runRemoval } from '../../dataqueries/AdminCleanup';
 import {
   DeleteButton, PageHeader, Panel, StatusPill, TextAction, colors, tableSx,
 } from './adminUi';
@@ -551,13 +552,15 @@ export default function PropertyManagement() {
       setError('This property has upcoming reservations. Hide it instead, or wait until they finish.');
       return;
     }
-    if (!window.confirm(`Delete "${p.title}" permanently? This cannot be undone.`)) return;
     try {
-      await deleteDoc(doc(db, 'properties', p.id));
-      // Also remove the private proof document (ignore if there is none)
-      deleteDoc(doc(db, 'propertyDocs', p.id)).catch(() => {});
+      // Reviews, booked/blocked nights and the private proof document go with the listing.
+      const plan = await planPropertyRemoval(p.id);
+      const extras = describeCounts({ ...plan.counts, listings: 0 });
+      const detail = extras.length ? ` ${extras.join(' and ')} will be removed with it.` : '';
+      if (!window.confirm(`Delete "${p.title}" permanently?${detail} This cannot be undone.`)) return;
+      await runRemoval(plan.refs);
       setSelectedId(null);
-      setSuccess('Record removed successfully.');
+      setSuccess('Listing and its related records removed.');
     } catch {
       setError('Could not delete record.');
     }

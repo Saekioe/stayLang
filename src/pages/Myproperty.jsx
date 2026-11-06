@@ -391,7 +391,7 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
 
 
 // ---------- ratings and reviews from your guests ----------
-function ReviewsPanel({ properties, reviews, onReply }) {
+function ReviewsPanel({ properties, reviews, onReply, onReport }) {
   const [propertyId, setPropertyId] = useState('all');
   const shown = propertyId === 'all' ? reviews : reviews.filter((r) => r.propertyId === propertyId);
   const count = shown.length;
@@ -473,9 +473,18 @@ function ReviewsPanel({ properties, reviews, onReply }) {
                     <Typography variant="body2">{r.hostReply}</Typography>
                   </Box>
                 )}
-                <Button size="small" sx={{ mt: 1 }} onClick={() => onReply(r)}>
-                  {r.hostReply ? 'Edit reply' : 'Reply'}
-                </Button>
+                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Button size="small" onClick={() => onReply(r)}>
+                    {r.hostReply ? 'Edit reply' : 'Reply'}
+                  </Button>
+                  {r.reported ? (
+                    <Chip size="small" label="Reported, waiting for our team" />
+                  ) : r.reportResolvedAt ? (
+                    <Typography variant="caption" sx={{ color: '#7A7070' }}>Report reviewed by our team</Typography>
+                  ) : (
+                    <Button size="small" color="inherit" onClick={() => onReport(r)}>Report review</Button>
+                  )}
+                </Box>
               </Box>
             );
           })
@@ -502,6 +511,9 @@ export default function MyProperty() {
   const [replying, setReplying] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [replySaving, setReplySaving] = useState(false);
+  const [reporting, setReporting] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportSaving, setReportSaving] = useState(false);
   const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews, 4 availability
 
   useEffect(() => {
@@ -635,6 +647,32 @@ export default function MyProperty() {
     }
   };
 
+  // Report an abusive or fake review so the admin can look at it (the review stays visible until then).
+  const openReport = (review) => {
+    setReporting(review);
+    setReportReason('');
+  };
+  const closeReport = () => {
+    if (!reportSaving) setReporting(null);
+  };
+  const saveReport = async () => {
+    if (!reportReason.trim()) return;
+    setReportSaving(true);
+    try {
+      await updateDoc(doc(db, 'reviews', reporting.id), {
+        reported: true,
+        reportReason: reportReason.trim(),
+        reportedAt: serverTimestamp(),
+      });
+      setReporting(null);
+      setNotice('Thanks. Our team will look at that review.');
+    } catch {
+      setError('Could not send your report. Make sure the latest Firestore rules are published.');
+    } finally {
+      setReportSaving(false);
+    }
+  };
+
   return (
     <Box sx={{ bgcolor: '#fff', minHeight: '100vh', }}>
       <NavigationBar />
@@ -761,7 +799,7 @@ export default function MyProperty() {
                   />
                 )}
 
-                {tab === 3 && <ReviewsPanel properties={properties} reviews={reviews} onReply={openReply} />}
+                {tab === 3 && <ReviewsPanel properties={properties} reviews={reviews} onReply={openReply} onReport={openReport} />}
 
                 {tab === 4 && <AvailabilityCalendar properties={properties} reservations={reservations} />}
               </Box>
@@ -835,6 +873,41 @@ export default function MyProperty() {
           <Button color="inherit" onClick={closeReply} disabled={replySaving}>Cancel</Button>
           <Button variant="contained" onClick={() => saveReply(replyText)} disabled={replySaving || !replyText.trim()}>
             {replySaving ? 'Saving…' : 'Save reply'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(reporting)} onClose={closeReport} fullWidth maxWidth="sm" aria-labelledby="report-title">
+        <DialogTitle id="report-title" sx={{ textAlign: 'left', color: '#3F3636', fontWeight: 700, fontSize: '1.25rem' }}>
+          Report this review
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'left' }}>
+          {reporting && (
+            <Box sx={{ mb: 2 }}>
+              <Typography sx={{ fontWeight: 600 }}>{reporting.guestName}</Typography>
+              <Rating value={reporting.rating} readOnly size="small" />
+              {reporting.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{reporting.text}</Typography>}
+            </Box>
+          )}
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            autoFocus
+            label="What is wrong with this review?"
+            placeholder="Example: Offensive language, not a real stay, shares personal information..."
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+            slotProps={{ htmlInput: { maxLength: 300 } }}
+          />
+          <Typography variant="caption" sx={{ color: '#7A7070', display: 'block', mt: 0.5 }}>
+            Our team checks every report. A review is only hidden if it breaks the rules, and you can report a review once.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button color="inherit" onClick={closeReport} disabled={reportSaving}>Cancel</Button>
+          <Button variant="contained" onClick={saveReport} disabled={reportSaving || !reportReason.trim()}>
+            {reportSaving ? 'Sending…' : 'Send report'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -8,9 +8,10 @@ import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import VerifiedOutlinedIcon from '@mui/icons-material/VerifiedOutlined';
 import { getAuth } from 'firebase/auth';
 import {
-  collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc, writeBatch,
+  collection, doc, onSnapshot, serverTimestamp, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
+import { describeCounts, planUserRemoval, runRemoval } from '../../dataqueries/AdminCleanup';
 import {
   DeleteButton, PageHeader, Panel, StatusPill, TextAction, colors, tableSx,
 } from './adminUi';
@@ -40,6 +41,8 @@ export default function UserManagement() {
   const [reason, setReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [deletePlan, setDeletePlan] = useState(null); // what the removal will do, or why it is blocked
+  const [planError, setPlanError] = useState('');
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({ firstName: '', lastName: '', phone: '' });
   const [editError, setEditError] = useState('');
@@ -108,24 +111,38 @@ export default function UserManagement() {
   const handleReinstate = (u) =>
     update(u.id, { disabled: false, disabledReason: '', disabledAt: null }, 'Account reinstated.');
 
+  // Work out everything the removal touches before asking the admin to confirm.
+  const openDelete = (u) => {
+    setDeleteTarget(u);
+    setDeletePlan(null);
+    setPlanError('');
+    planUserRemoval(u)
+      .then(setDeletePlan)
+      .catch((err) => {
+        console.error(err);
+        setPlanError(`Could not check what this user owns: ${err.code || err.message}`);
+      });
+  };
+
+  const closeDelete = () => {
+    setDeleteTarget(null);
+    setDeletePlan(null);
+    setPlanError('');
+  };
+
   const confirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !deletePlan || deletePlan.blockers.length) return;
     setDeleting(true);
     try {
-      const batch = writeBatch(db);
-      batch.delete(doc(db, 'users', deleteTarget.id));
-      if (deleteTarget.username) {
-        batch.delete(doc(db, 'usernames', deleteTarget.username.toLowerCase()));
-      }
-      await batch.commit();
+      await runRemoval(deletePlan.refs);
       setSelected(null);
-      setSuccess('Record removed successfully.');
+      setSuccess('User and their related records removed.');
     } catch (err) {
       console.error(err);
-      setError(`Could not delete record: ${err.code || err.message}`);
+      setError(`Could not finish deleting: ${err.code || err.message}. Nothing is lost, you can run it again.`);
     } finally {
       setDeleting(false);
-      setDeleteTarget(null);
+      closeDelete();
     }
   };
 
@@ -251,7 +268,7 @@ export default function UserManagement() {
                               </TextAction>
                               <DeleteButton
                                 label={`Delete ${u.firstName ?? 'user'}`}
-                                onClick={() => setDeleteTarget(u)}
+                                onClick={() => openDelete(u)}
                               />
                             </>
                           )}
@@ -372,7 +389,7 @@ export default function UserManagement() {
       {/* Delete dialog */}
       <Dialog
         open={Boolean(deleteTarget)}
-        onClose={() => !deleting && setDeleteTarget(null)}
+        onClose={() => !deleting && closeDelete()}
         fullWidth
         maxWidth="xs"
       >
@@ -381,13 +398,34 @@ export default function UserManagement() {
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14, color: colors.muted }}>
-            This will permanently remove the user record. You cannot undo this.
+            This permanently removes the profile, username and host application. You cannot undo this.
             If you only want to stop their access, use Suspend instead.
+          </Typography>
+
+          {!deletePlan && !planError && (
+            <Typography sx={{ fontSize: 13, color: colors.muted, mt: 2 }}>Checking what else this user owns…</Typography>
+          )}
+          {planError && <Alert severity="error" sx={{ mt: 2 }}>{planError}</Alert>}
+          {deletePlan && deletePlan.blockers.length > 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>{deletePlan.blockers.join(' ')}</Alert>
+          )}
+          {deletePlan && deletePlan.blockers.length === 0 && describeCounts(deletePlan.counts).length > 0 && (
+            <Typography sx={{ fontSize: 14, mt: 2 }}>
+              Also removed: {describeCounts(deletePlan.counts).join(', ')}. Past reservations stay in the records.
+            </Typography>
+          )}
+          <Typography sx={{ fontSize: 12, color: colors.muted, mt: 2 }}>
+            Their sign-in account stays, but they can no longer use it: signing in shows that the account no longer exists.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={confirmDelete} disabled={deleting}>
+          <Button onClick={closeDelete} disabled={deleting}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+            disabled={deleting || !deletePlan || deletePlan.blockers.length > 0}
+          >
             {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>

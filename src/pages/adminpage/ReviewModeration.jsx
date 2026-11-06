@@ -47,6 +47,7 @@ export default function ReviewModeration() {
       all: reviews.length,
       low: reviews.filter((r) => (r.rating ?? 0) <= 2).length,
       hidden: reviews.filter((r) => r.hidden).length,
+      reported: reviews.filter((r) => r.reported).length,
       replied: reviews.filter((r) => r.hostReply).length,
       noReply: reviews.filter((r) => !r.hostReply).length,
       average: visible.length ? (total / visible.length).toFixed(1) : '-',
@@ -58,6 +59,7 @@ export default function ReviewModeration() {
       tab === 'all' ||
       (tab === 'low' && (r.rating ?? 0) <= 2) ||
       (tab === 'hidden' && r.hidden) ||
+      (tab === 'reported' && r.reported) ||
       (tab === 'replied' && r.hostReply) ||
       (tab === 'noreply' && !r.hostReply);
     const text = `${r.guestName} ${r.propertyTitle} ${r.text} ${r.hostReply}`.toLowerCase();
@@ -67,7 +69,7 @@ export default function ReviewModeration() {
   const current = selected ? reviews.find((r) => r.id === selected) : null;
 
   const openHide = (rev) => {
-    setReason('');
+    setReason(rev.reported ? (rev.reportReason ?? '') : '');
     setReasonError(false);
     setHideTarget(rev);
   };
@@ -81,6 +83,8 @@ export default function ReviewModeration() {
         hidden: true,
         hiddenReason: reason.trim(),
         hiddenAt: serverTimestamp(),
+        // Hiding a reported review settles the report
+        ...(hideTarget.reported ? { reported: false, reportResolvedAt: serverTimestamp() } : {}),
       });
       setSuccess('Review hidden from the public.');
       setHideTarget(null);
@@ -103,6 +107,20 @@ export default function ReviewModeration() {
     } catch (err) {
       console.error(err);
       setError(`Could not restore review: ${err.code || err.message}`);
+    }
+  };
+
+  // The review stays public; the report is closed and the host cannot report it again.
+  const dismissReport = async (rev) => {
+    try {
+      await updateDoc(doc(db, 'reviews', rev.id), {
+        reported: false,
+        reportResolvedAt: serverTimestamp(),
+      });
+      setSuccess('Report dismissed. The review stays as it is.');
+    } catch (err) {
+      console.error(err);
+      setError(`Could not dismiss report: ${err.code || err.message}`);
     }
   };
 
@@ -132,10 +150,11 @@ export default function ReviewModeration() {
         subtitle="Check guest reviews and host replies. Hide anything that breaks the rules."
       />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 2, mb: 2 }}>
         <Stat label="Total reviews" value={stats.all} />
         <Stat label="Average rating" value={stats.average} />
         <Stat label="Low rated (1-2)" value={stats.low} />
+        <Stat label="Reported by hosts" value={stats.reported} />
         <Stat label="Hidden" value={stats.hidden} />
       </Box>
 
@@ -173,6 +192,7 @@ export default function ReviewModeration() {
           sx={{ px: 2, borderBottom: `1px solid ${colors.line}` }}
         >
           <Tab value="all" label={`All (${stats.all})`} />
+          <Tab value="reported" label={`Reported (${stats.reported})`} />
           <Tab value="low" label={`Low rated (${stats.low})`} />
           <Tab value="hidden" label={`Hidden (${stats.hidden})`} />
           <Tab value="replied" label={`Replied (${stats.replied})`} />
@@ -223,16 +243,25 @@ export default function ReviewModeration() {
                           Host replied
                         </Typography>
                       )}
+                      {rev.reported && (
+                        <Typography sx={{ fontSize: 12, color: colors.danger, mt: 0.5 }}>
+                          Reported: {rev.reportReason}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <StatusPill
-                        label={rev.hidden ? 'Hidden' : 'Visible'}
-                        variant={rev.hidden ? 'disabled' : 'active'}
-                      />
+                      <Box sx={{ display: 'grid', gap: 0.5, justifyItems: 'start' }}>
+                        <StatusPill
+                          label={rev.hidden ? 'Hidden' : 'Visible'}
+                          variant={rev.hidden ? 'disabled' : 'active'}
+                        />
+                        {rev.reported && <StatusPill label="Reported" variant="pending" />}
+                      </Box>
                     </TableCell>
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5 }}>
                         <TextAction onClick={() => setSelected(rev.id)}>View</TextAction>
+                        {rev.reported && <TextAction onClick={() => dismissReport(rev)}>Dismiss</TextAction>}
                         <TextAction onClick={() => (rev.hidden ? handleUnhide(rev) : openHide(rev))}>
                           {rev.hidden ? 'Restore' : 'Hide'}
                         </TextAction>
@@ -273,9 +302,18 @@ export default function ReviewModeration() {
                 <Detail label="Posted" value={formatDate(current.createdAt)} />
                 <Detail label="Status" value={current.hidden ? 'Hidden' : 'Visible'} />
                 {current.hidden && <Detail label="Reason hidden" value={current.hiddenReason} pre />}
+                {current.reported && (
+                  <>
+                    <Detail label="Reported by the host" value={formatDate(current.reportedAt)} />
+                    <Detail label="Host's reason" value={current.reportReason} pre />
+                  </>
+                )}
               </Box>
             </DialogContent>
             <DialogActions>
+              {current.reported && (
+                <Button onClick={() => dismissReport(current)}>Dismiss report</Button>
+              )}
               <Button
                 onClick={() => {
                   if (current.hidden) {
