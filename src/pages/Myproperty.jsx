@@ -793,7 +793,7 @@ export default function MyProperty() {
         </Dialog>
 
       <Dialog open={Boolean(replying)} onClose={closeReply} fullWidth maxWidth="sm" aria-labelledby="reply-title">
-        <DialogTitle id="reply-title" sx={{ textAlign: 'left' }}>
+        <DialogTitle id="reply-title" sx={{ textAlign: 'left', color: '#3F3636', fontWeight: 700, fontSize: '1.25rem' }}>
           Reply to {replying?.guestName}
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'left' }}>
