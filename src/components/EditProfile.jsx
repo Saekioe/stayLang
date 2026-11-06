@@ -1,14 +1,155 @@
 import { useState } from 'react';
 import {
-  Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert,
+  Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, IconButton, InputAdornment, Divider,
 } from '@mui/material';
+import { Visibility, VisibilityOff, LockReset } from '@mui/icons-material';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { db, auth } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 
-// The form lives inside the Dialog, so MUI mounts it fresh every time the dialog
-// opens. That makes the fields start from the profile that is loaded right now,
-// instead of from whatever the profile was when the navbar first rendered.
+// --- Change Password Dialog Component ---
+function ChangePasswordDialog({ open, onClose, user }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+
+  const handleResetForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    onClose();
+  };
+
+  const handleChangePassword = async () => {
+    if (!user) return;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setErrorMsg('Please fill in all password fields.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setErrorMsg('New password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('New passwords do not match.');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      // 1. Re-authenticate user with their recent/current password for security
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // 2. Update to the new password
+      await updatePassword(user, newPassword);
+
+      setSuccessMsg('Password updated successfully!');
+      setTimeout(() => {
+        handleResetForm();
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setErrorMsg('Incorrect current password.');
+      } else {
+        setErrorMsg('Failed to update password. Please try again.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={handleResetForm} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { borderRadius: '1px', p: 1 } }}>
+      <DialogTitle sx={{ fontWeight: 700, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <LockReset color="primary" /> Change Password
+      </DialogTitle>
+      <DialogContent dividers>
+        {errorMsg && <Alert severity="error" sx={{ mb: 2, borderRadius: '1px' }}>{errorMsg}</Alert>}
+        {successMsg && <Alert severity="success" sx={{ mb: 2, borderRadius: '1px' }}>{successMsg}</Alert>}
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+          <TextField
+            label="Current Password"
+            type={showCurrent ? 'text' : 'password'}
+            size="small"
+            fullWidth
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowCurrent(!showCurrent)} edge="end" size="small">
+                    {showCurrent ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            label="New Password"
+            type={showNew ? 'text' : 'password'}
+            size="small"
+            fullWidth
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowNew(!showNew)} edge="end" size="small">
+                    {showNew ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            label="Confirm New Password"
+            type={showConfirm ? 'text' : 'password'}
+            size="small"
+            fullWidth
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowConfirm(!showConfirm)} edge="end" size="small">
+                    {showConfirm ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, px: 3 }}>
+        <Button onClick={handleResetForm} color="inherit" disabled={saving}>
+          Cancel
+        </Button>
+        <Button onClick={handleChangePassword} variant="contained" disabled={saving} sx={{ borderRadius: '1px', textTransform: 'none', px: 3 }}>
+          {saving ? 'Updating...' : 'Update Password'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// --- Main Profile Form Component ---
 function ProfileForm({ onClose, user, profile }) {
   const { setProfile } = useAuth();
   const [firstName, setFirstName] = useState(profile?.firstName || '');
@@ -17,6 +158,7 @@ function ProfileForm({ onClose, user, profile }) {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -33,7 +175,6 @@ function ProfileForm({ onClose, user, profile }) {
       phone: phone.trim(),
     };
     try {
-      // merge: true keeps username, birthday, email, etc. untouched.
       await setDoc(doc(db, 'users', user.uid), changes, { merge: true });
       setProfile((prev) => ({ ...(prev ?? {}), ...changes }));
       setSuccessMsg('Profile updated successfully!');
@@ -47,10 +188,10 @@ function ProfileForm({ onClose, user, profile }) {
 
   return (
     <>
-      <DialogTitle sx={{ fontWeight: 700, color: 'black' }}>Edit Account Information</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700, color: 'text.primary' }}>Edit Account Information</DialogTitle>
       <DialogContent dividers>
-        {errorMsg && <Alert severity="error" sx={{ mb: 2 }}>{errorMsg}</Alert>}
-        {successMsg && <Alert severity="success" sx={{ mb: 2 }}>{successMsg}</Alert>}
+        {errorMsg && <Alert severity="error" sx={{ mb: 2, borderRadius: '1px' }}>{errorMsg}</Alert>}
+        {successMsg && <Alert severity="success" sx={{ mb: 2, borderRadius: '1px' }}>{successMsg}</Alert>}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           <TextField
@@ -75,23 +216,48 @@ function ProfileForm({ onClose, user, profile }) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
+
+          <Divider sx={{ my: 1 }} />
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Box sx={{ fontWeight: 600, fontSize: '0.9rem' }}>Password</Box>
+              <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>Protect your account with a secure password</Box>
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setPasswordDialogOpen(true)}
+              sx={{ borderRadius: '1px', textTransform: 'none' }}
+            >
+              Change Password
+            </Button>
+          </Box>
         </Box>
       </DialogContent>
+
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose} color="inherit" disabled={saving}>
           Cancel
         </Button>
-        <Button onClick={handleSaveProfile} variant="contained" disabled={saving} sx={{ borderRadius: '8px' }}>
+        <Button onClick={handleSaveProfile} variant="contained" disabled={saving} sx={{ borderRadius: '1px', textTransform: 'none', px: 3 }}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </DialogActions>
+
+      {/* Sub-dialog for changing password */}
+      <ChangePasswordDialog
+        open={passwordDialogOpen}
+        onClose={() => setPasswordDialogOpen(false)}
+        user={user}
+      />
     </>
   );
 }
 
 export default function EditProfile({ open, onClose, user, profile }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { borderRadius: '12px' } }}>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth sx={{ '& .MuiDialog-paper': { borderRadius: '1px' } }}>
       <ProfileForm onClose={onClose} user={user} profile={profile} />
     </Dialog>
   );

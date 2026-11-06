@@ -68,23 +68,23 @@ export default function NavigationBar() {
             <Box
               component="img"
               src={logo}
-              alt="StayLang Logo"
+              alt="Pahinga Logo"
               sx={{ height: 35, ml: 1.25 }}
             />
             <Typography
               variant="h6"
               component={RouterLink}
               to="/"
-              sx={{ fontWeight: 'bold', color: '#0f4a5f', textDecoration: 'none', fontSize: '1.1rem', ml: 1 }}
+              sx={{ fontWeight: 'bold', color: '#0f4a5f', textDecoration: 'none', fontSize: '1.1rem', mx: 1 }}
             >
-              StayLang
+              Pahinga
             </Typography>
           </Box>
           </Box>
           
           
           <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', ml: { xs: 0, md: 9 }, bgcolor: 'white', px: 2, borderRadius: 10, py: 0.5, boxShadow: '0 1px 10px rgba(0,0,0,0.1)', py: 1 }}>
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, textShadow: '0 1px 10px rgba(0,0,0,0.1)' }}>
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, textShadow: '0 1px 10px rgba(0,0,0,0.1)', ml: 2, fontSize: '0.9rem', fontWeight: 900 }}>
             {navLinks.map(({ label, to }) => (
               <Button
                 key={label}
@@ -160,20 +160,20 @@ export default function NavigationBar() {
                   onClose={closeMenu}
                   anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                   transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                  slotProps={{ paper: { sx: { mt: 1, minWidth: 240, borderRadius: '12px' } } }}
+                  slotProps={{ paper: { sx: { mt: 1, minWidth: 240, borderRadius: '1px', } } }}
                 >
-                  <Box sx={{ px: 2, py: 1.25, textAlign: 'left' }}>
+                  <Box sx={{ px: 2, pb: 3, textAlign: 'left', pt: 1.5 }}>
                     <Typography sx={{ fontWeight: 700 }} noWrap>{fullName}</Typography>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{user.email}</Typography>
                   </Box>
                   <Divider />
                   <MenuItem component={RouterLink} to="/my-bookings" onClick={closeMenu}>
                     <ListItemIcon><EventNoteIcon fontSize="small" /></ListItemIcon>
-                    <ListItemText>My bookings</ListItemText>
+                    <ListItemText><Typography sx={{ fontSize: 17, fontWeight: 600, color: '#5f5f5f' }}>My bookings</Typography></ListItemText>
                   </MenuItem>
                   <MenuItem onClick={() => { closeMenu(); setEditOpen(true); }}>
                     <ListItemIcon><ManageAccountsIcon fontSize="small" /></ListItemIcon>
-                    <ListItemText>Edit profile</ListItemText>
+                    <ListItemText><Typography sx={{ fontSize: 17, fontWeight: 600, color: '#5f5f5f' }}>Edit profile</Typography></ListItemText>
                   </MenuItem>
                   <Divider />
                   <MenuItem
@@ -183,7 +183,7 @@ export default function NavigationBar() {
                     }}
                   >
                     <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-                    <ListItemText>Logout</ListItemText>
+                    <ListItemText><Typography sx={{ fontSize: 17, fontWeight: 600, color: '#5f5f5f' }}>Logout</Typography></ListItemText>
                   </MenuItem>
                 </Menu>
                 

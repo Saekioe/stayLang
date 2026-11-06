@@ -6,7 +6,7 @@ import subimage from '../images/subimage.png';
 
 export default function FrontPage() {
   return (
-    <Box sx={{ px: { xs: 1.5, md: 5.5 }, backgroundColor: '#ffffff', pt: { xs: 3, md: 10 } }}>
+    <Box sx={{ px: { xs: 1.5, md: 5.5 }, backgroundColor: '#ffffff', pt: { xs: 3, md: 6 } }}>
       <Box
         sx={{
           minHeight: { xs: 620, md: 850 },

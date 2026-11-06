@@ -243,7 +243,7 @@ export default function AdminNotifications() {
           </Typography>
 
           <Typography sx={{ fontSize: 12, color: colors.muted }}>
-            Recent activity across StayLang
+            Recent activity across Pahinga
           </Typography>
         </Box>
 

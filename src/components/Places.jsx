@@ -180,7 +180,7 @@ export default function Places() {
         }}
       >
         <Typography variant="body2" sx={{ fontFamily: urbanist, opacity: 0.8 }}>
-          Staylang @ {new Date().getFullYear()} All rights reserved.
+          Pahinga @ {new Date().getFullYear()} All rights reserved.
         </Typography>
       </Box>
     </Box>

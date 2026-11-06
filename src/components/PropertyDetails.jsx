@@ -31,27 +31,12 @@ import CreditCardOutlinedIcon from '@mui/icons-material/CreditCardOutlined';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-
-import {
-  addDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  serverTimestamp,
-} from 'firebase/firestore';
-
-import { db } from '../firebase/firebase';
+import { money, useBookedNights, usePlatformSettings } from '../dataqueries/Booking';
+import { computeQuote, nightsBetween, nightsCount } from '../dataqueries/Pricing';
+import { createReservation } from '../dataqueries/Reservation';
 import { useAuth } from '../auth/Auth';
 import { usePropertyReviews } from '../dataqueries/Data';
 
-import {
-  computeQuote,
-  money,
-  nightsBetween,
-  useBookedNights,
-  usePlatformSettings,
-} from '../dataqueries/Booking';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -71,28 +56,42 @@ const addDays = (iso, n) => {
 // One row of the guest picker: label, age hint, and a - / + stepper
 function GuestCounter({ label, hint, value, min = 0, canAdd, onChange }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1 }}>
-      <Box>
-        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>{label}</Typography>
-        <Typography sx={{ fontSize: '0.75rem', color: '#777777' }}>{hint}</Typography>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 2,
+        py: 1.25,
+        '&:not(:last-of-type)': { borderBottom: '1px solid #EEF2F6' },
+      }}
+    >
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.3 }}>{label}</Typography>
+        <Typography sx={{ fontSize: '0.75rem', color: '#777777', lineHeight: 1.3 }}>{hint}</Typography>
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, gap: 1 }}>
         <IconButton
           size="small"
           aria-label={`Fewer ${label}`}
           disabled={value <= min}
           onClick={() => onChange(-1)}
-          sx={{ border: '1px solid #CBD5E1' }}
+          sx={{ border: '1px solid #CBD5E1', width: 30, height: 30 }}
         >
           <RemoveIcon fontSize="small" />
         </IconButton>
-        <Typography sx={{ minWidth: 18, textAlign: 'center' }}>{value}</Typography>
+
+        <Typography sx={{ width: 28, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+        </Typography>
+
         <IconButton
           size="small"
           aria-label={`More ${label}`}
           disabled={!canAdd}
           onClick={() => onChange(1)}
-          sx={{ border: '1px solid #CBD5E1' }}
+          sx={{ border: '1px solid #CBD5E1', width: 30, height: 30 }}
         >
           <AddIcon fontSize="small" />
         </IconButton>
@@ -128,12 +127,7 @@ function Details({ place, onClose }) {
 
   const isOwner = Boolean(user) && user.uid === place.ownerId;
 
-  const nights =
-    checkIn && checkOut
-      ? Math.round(
-          (new Date(checkOut) - new Date(checkIn)) / 86400000
-        )
-      : 0;
+  const nights = nightsCount(checkIn, checkOut); // check-out day is not a night
 
   const { serviceFeePercent } = usePlatformSettings();
   const bookedNights = useBookedNights(place.id);
@@ -265,72 +259,10 @@ function Details({ place, onClose }) {
       return;
     }
 
-    setBusy(true);
+        setBusy(true);
 
     try {
-      const mine = await getDocs(
-        query(
-          collection(db, 'reservations'),
-          where('guestId', '==', user.uid),
-          where('propertyId', '==', place.id)
-        )
-      );
-
-      const clash = mine.docs.some((doc) => {
-        const reservation = doc.data();
-
-        return (
-          (reservation.status === 'pending' ||
-            reservation.status === 'confirmed') &&
-          reservation.checkIn < checkOut &&
-          reservation.checkOut > checkIn
-        );
-      });
-
-      if (clash) {
-        setNotice({
-          severity: 'error',
-          text: 'You already have a request for this place that overlaps these dates.',
-        });
-        return;
-      }
-
-      await addDoc(collection(db, 'reservations'), {
-        propertyId: place.id,
-        propertyTitle: place.name,
-        ownerId: place.ownerId,
-
-        guestId: user.uid,
-        guestName: profile
-          ? `${profile.firstName} ${profile.lastName}`
-          : user.displayName || user.email,
-
-        guestEmail: user.email,
-        guestPhone: profile?.phone || '',
-
-        checkIn,
-        checkOut,
-        nights,
-
-        // `guests` is adults + children, so older screens and capacity checks keep working
-        guests: countedGuests,
-        adults: party.adults,
-        children: party.children,
-        infants: party.infants,
-        pets: party.pets,
-
-        nightlyRate: quote.nightlyRate,
-        subtotal: quote.subtotal,
-        cleaningFee: quote.cleaningFee,
-        serviceFeePercent: quote.serviceFeePercent,
-        serviceFee: quote.serviceFee,
-        total: quote.total,
-
-        currency: 'PHP',
-        paymentStatus: 'unpaid',
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
+      await createReservation({ place, user, profile, checkIn, checkOut, party, quote });
 
       setNotice({
         severity: 'success',
@@ -341,12 +273,16 @@ function Details({ place, onClose }) {
 
       setNotice({
         severity: 'error',
-        text: 'Could not send your request. Please try again.',
+        text:
+          error.message === 'clash'
+            ? 'You already have a request for this place that overlaps these dates.'
+            : 'Could not send your request. Please try again.',
       });
     } finally {
       setBusy(false);
     }
   };
+
 
   const amenityIcon = (amenity) => {
     if (amenity.Icon) {
@@ -746,6 +682,23 @@ function Details({ place, onClose }) {
               </Typography>
             </Box>
 
+              <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.7,
+                bgcolor: '#E7EAF0',
+                color: '#525B6B',
+                borderRadius: 5,
+                px: 1.3,
+                py: 0.7,
+              }}
+            >
+              <Typography sx={{ fontSize: '0.68rem' }}>
+                No cancellation policy once confirmed.
+              </Typography>
+            </Box>
+
             <Box
               sx={{
                 display: 'flex',
@@ -863,19 +816,6 @@ function Details({ place, onClose }) {
                   canAdd={canAdd('infants')}
                   onChange={(d) => changeParty('infants', d)}
                 />
-              )}
-              {limits.pets > 0 ? (
-                <GuestCounter
-                  label="Pets"
-                  hint={`Up to ${limits.pets} allowed`}
-                  value={party.pets}
-                  canAdd={canAdd('pets')}
-                  onChange={(d) => changeParty('pets', d)}
-                />
-              ) : (
-                <Typography sx={{ fontSize: '0.75rem', color: '#777777', py: 1 }}>
-                  Pets are not allowed here.
-                </Typography>
               )}
               <Typography sx={{ fontSize: '0.72rem', color: '#777777', pb: 1 }}>
                 This place fits up to {plural(capacity, 'guest')} (adults and children).

@@ -145,7 +145,7 @@ export default function Settings() {
 
       <PageHeader
         title="Categories & Platform Settings"
-        subtitle="Control property categories, service fees and site availability across StayLang."
+        subtitle="Control property categories, service fees and site availability across Pahinga."
       />
 
       <Panel title="Manage Property Categories" subtitle="Add and remove categories used to organize properties">

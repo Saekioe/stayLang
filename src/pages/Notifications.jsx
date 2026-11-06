@@ -35,66 +35,135 @@ const surfaceSx = {
   overflow: 'hidden',
 };
 
+const CHIP = {
+  green: { bgcolor: '#DFEEDF', color: '#2E6B3F' },
+  yellow: { bgcolor: '#FBF1C0', color: '#6B5200' },
+  grey: { bgcolor: '#EFECEC', color: '#7A7070' },
+  red: { bgcolor: '#F8E1DF', color: '#8A2E26' },
+  blue: { bgcolor: '#E3EAF7', color: '#27437A' },
+  teal: { bgcolor: '#E8F1F4', color: '#2F5E70' },
+};
+
+// Is this message for the user as a host? Older messages have no `recipient` field.
+const isHostNote = (n) =>
+  n.recipient
+    ? n.recipient === 'host'
+    : ['reservation_requested', 'payment_received', 'damage_paid'].includes(n.type) ||
+      (n.type === 'reservation_cancelled' && n.cancelledBy === 'guest');
+
 // Turns a notification document into text, a status chip, and a link.
 function describe(n) {
+  const host = isHostNote(n);
+  const link = host ? '/my-property' : '/my-bookings';
   const when = `${fmt(n.checkIn)} to ${fmt(n.checkOut)}, ${plural(n.nights ?? 0, 'night')}`;
+  const place = n.propertyTitle || 'your booking';
+
   switch (n.type) {
+    case 'reservation_requested':
+      return {
+        title: `New booking request for ${place}`,
+        body: `${n.guestName ? `${n.guestName}: ` : ''}${when}. Total ${money(n.total)}.`,
+        chip: { label: 'New request', sx: CHIP.yellow },
+        link,
+      };
+    case 'reservation_pending':
+      return {
+        title: `Your request for ${place} was sent`,
+        body: `${when}. Waiting for the host to reply.`,
+        chip: { label: 'Pending', sx: CHIP.yellow },
+        link,
+      };
     case 'reservation_confirmed':
       return {
-        title: `Your booking at ${n.propertyTitle} is confirmed`,
+        title: `Your booking at ${place} is confirmed`,
         body: `${when}. Total ${money(n.total)}.`,
-        chip: { label: 'Confirmed', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
-        link: '/my-bookings',
+        chip: { label: 'Confirmed', sx: CHIP.green },
+        link,
       };
     case 'reservation_declined':
       return {
-        title: `Your request for ${n.propertyTitle} was declined`,
+        title: `Your request for ${place} was declined`,
         body: `${when}. You can look for other places or dates.`,
-        chip: { label: 'Declined', sx: { bgcolor: '#EFECEC', color: '#7A7070' } },
-        link: '/my-bookings',
+        chip: { label: 'Declined', sx: CHIP.grey },
+        link,
       };
-    case 'reservation_cancelled':
-      // cancelledBy === 'guest' means the guest cancelled, so this message is for the host.
-      return n.cancelledBy === 'guest'
-        ? {
-            title: `A guest cancelled their booking at ${n.propertyTitle}`,
-            body: `${when}. The nights are open for booking again.`,
-            chip: { label: 'Cancelled', sx: { bgcolor: '#F8E1DF', color: '#8A2E26' } },
-            link: '/my-property',
-          }
-        : {
-            title: `The host cancelled your booking at ${n.propertyTitle}`,
-            body: `${when}.`,
-            chip: { label: 'Cancelled', sx: { bgcolor: '#F8E1DF', color: '#8A2E26' } },
-            link: '/my-bookings',
-          };
+    case 'reservation_unavailable':
+      return {
+        title: `Dates no longer available at ${place}`,
+        body: `${when}. The host confirmed another booking for these dates. You can look for other dates.`,
+        chip: { label: 'Unavailable', sx: CHIP.grey },
+        link,
+      };
+    case 'reservation_cancelled': {
+      const by = n.cancelledBy;
+      let title;
+      if (host) {
+        title = by === 'guest' ? `A guest cancelled their booking at ${place}` : `You cancelled a booking at ${place}`;
+      } else {
+        title = by === 'host' ? `The host cancelled your booking at ${place}` : `You cancelled your booking at ${place}`;
+      }
+      return {
+        title,
+        body: `${when}. The dates are open for booking again.`,
+        chip: { label: 'Cancelled', sx: CHIP.red },
+        link,
+      };
+    }
+    case 'cancellation_fee_due':
+      return {
+        title: `Cancellation fee due for ${place}`,
+        body: `${when}. Pay ${money(n.amount)} to finish cancelling.`,
+        chip: { label: 'Fee due', sx: CHIP.red },
+        link,
+      };
+    case 'cancellation_fee_paid':
+      return {
+        title: host ? `Cancellation fee received for ${place}` : `Cancellation fee paid for ${place}`,
+        body: `${when}. ${money(n.amount)} was paid.`,
+        chip: { label: 'Paid', sx: CHIP.green },
+        link,
+      };
+    case 'damage_reported':
+      return {
+        title: `Damage reported at ${place}`,
+        body: `${when}. The host added a charge of ${money(n.amount)}. Open the booking to see the details and pay it.`,
+        chip: { label: 'Damage charge', sx: CHIP.red },
+        link,
+      };
+    case 'damage_paid':
+      return {
+        title: host ? `Damage charge paid for ${place}` : `Damage charge paid for ${place}`,
+        body: `${when}. ${money(n.amount)} was paid.`,
+        chip: { label: 'Paid', sx: CHIP.green },
+        link,
+      };
     case 'payment_confirmed':
       return {
-        title: `Payment received for ${n.propertyTitle}`,
+        title: `Payment received for ${place}`,
         body: `${when}. You paid ${money(n.total)}.`,
-        chip: { label: 'Paid', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
-        link: '/my-bookings',
+        chip: { label: 'Paid', sx: CHIP.green },
+        link,
       };
     case 'payment_received':
       return {
-        title: `A guest paid for ${n.propertyTitle}`,
+        title: `A guest paid for ${place}`,
         body: `${when}. ${money(n.total)} was paid.`,
-        chip: { label: 'Paid', sx: { bgcolor: '#DFEEDF', color: '#2E6B3F' } },
-        link: '/my-property',
+        chip: { label: 'Paid', sx: CHIP.green },
+        link,
       };
     case 'payment_refunded':
       return {
-        title: `Your payment for ${n.propertyTitle} was refunded`,
+        title: `Your payment for ${place} was refunded`,
         body: `${when}. ${money(n.total)} was returned to you.`,
-        chip: { label: 'Refunded', sx: { bgcolor: '#E3EAF7', color: '#27437A' } },
-        link: '/my-bookings',
+        chip: { label: 'Refunded', sx: CHIP.blue },
+        link,
       };
     default:
       return {
         title: n.propertyTitle ?? 'Update',
         body: when,
-        chip: { label: 'Update', sx: { bgcolor: '#E8F1F4', color: '#2F5E70' } },
-        link: '/my-bookings',
+        chip: { label: 'Update', sx: CHIP.teal },
+        link,
       };
   }
 }
@@ -154,7 +223,7 @@ export default function Notifications() {
               Notifications
             </Typography>
             <Typography sx={{ color: '#7A7070', mt: 1 }}>
-              Display booking status and updates
+              Booking updates as a guest and as a host
             </Typography>
           </Box>
           <Button variant="outlined" disabled={busy || unread === 0} onClick={markAllRead}>
@@ -191,7 +260,7 @@ export default function Notifications() {
               </Typography>
               <Typography sx={{ color: '#7A7070', maxWidth: 420, mx: 'auto' }}>
                 {items.length === 0
-                  ? 'When a host confirms, declines, or cancels a booking, you will see it here.'
+                  ? 'Booking requests, confirmations, cancellations and payment updates will show up here.'
                   : 'There are no unread messages.'}
               </Typography>
             </Box>
@@ -230,6 +299,7 @@ export default function Notifications() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontWeight: n.read ? 600 : 700 }}>{d.title}</Typography>
                         <Chip size="small" label={d.chip.label} sx={{ fontWeight: 600, ...d.chip.sx }} />
+                        <Chip size="small" variant="outlined" label={isHostNote(n) ? 'As host' : 'As guest'} />
                       </Box>
                       <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.25 }}>{d.body}</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>

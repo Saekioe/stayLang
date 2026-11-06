@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  collection, doc, getDocs, onSnapshot, query, serverTimestamp, where, writeBatch,
+  collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebase';
+import { todayISO } from './Pricing';
+
 
 /* ---------- currency ---------- */
 
@@ -22,38 +24,7 @@ export const money = (n) => formatter.format(Number(n) || 0);
 
 export const DEFAULT_SERVICE_FEE_PERCENT = 10;
 
-// The price breakdown, worked out the same way everywhere (booking card,
-// saved reservation, host earnings).
-//   subtotal   = nightly rate x nights
-//   cleaning   = the host's fixed fee, charged once per stay
-//   serviceFee = platform percentage of (subtotal + cleaning), rounded to whole pesos
-//   total      = what the guest pays
-export function computeQuote({
-  pricePerNight,
-  nights,
-  cleaningFee = 0,
-  serviceFeePercent = DEFAULT_SERVICE_FEE_PERCENT,
-}) {
-  const n = Math.max(0, Math.floor(Number(nights) || 0));
-  const rate = Number(pricePerNight) || 0;
-  const pct = Math.max(0, Number(serviceFeePercent) || 0);
-  const cleaning = n > 0 ? Math.max(0, Number(cleaningFee) || 0) : 0;
-  const subtotal = n * rate;
-  const serviceFee = n > 0 ? Math.round(((subtotal + cleaning) * pct) / 100) : 0;
-  return {
-    nights: n,
-    nightlyRate: rate,
-    subtotal,
-    cleaningFee: cleaning,
-    serviceFeePercent: pct,
-    serviceFee,
-    total: subtotal + cleaning + serviceFee,
-  };
-}
 
-// What the host actually earns from a reservation (the service fee goes to the platform).
-// Older reservations have no serviceFee field, so they count in full.
-export const hostPayout = (r) => (r.total ?? 0) - (r.serviceFee ?? 0);
 
 // Platform-wide settings, kept in Firestore at settings/platform.
 // Falls back to the default if the document is missing or cannot be read.
@@ -91,10 +62,7 @@ export const STATUS_LABELS = {
 };
 
 const pad = (n) => String(n).padStart(2, '0');
-export const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+
 
 export function statusOf(reservation) {
   if (reservation.status === 'confirmed' && reservation.checkOut && reservation.checkOut < todayISO()) {
@@ -105,19 +73,6 @@ export function statusOf(reservation) {
 
 /* ---------- availability ---------- */
 
-// Every night of a stay as "YYYY-MM-DD" strings. The check-out day is not a night,
-// so a stay ending on the 5th does not block a stay starting on the 5th.
-export function nightsBetween(checkIn, checkOut) {
-  if (!checkIn || !checkOut) return [];
-  const [y, m, d] = checkIn.split('-').map(Number);
-  const [y2, m2, d2] = checkOut.split('-').map(Number);
-  const end = Date.UTC(y2, m2 - 1, d2);
-  const nights = [];
-  for (let t = Date.UTC(y, m - 1, d); t < end; t += 86400000) {
-    nights.push(new Date(t).toISOString().slice(0, 10));
-  }
-  return nights;
-}
 
 // Every taken night of one property, updating live. Each is a small document in
 // `bookedNights` (id: propertyId_date): either a confirmed booking (has reservationId)
@@ -186,63 +141,6 @@ const message = (r, userId, type, extra = {}) => ({
   ...extra,
 });
 
-// Host confirms a pending request: status, the booked nights and the guest's
-// message are written together, or not at all.
-// Throws Error('overlap') if any of the nights is already taken.
-export async function confirmReservation(r) {
-  const nights = nightsBetween(r.checkIn, r.checkOut);
-  const taken = await getDocs(query(collection(db, 'bookedNights'), where('propertyId', '==', r.propertyId)));
-  const takenDates = new Set(taken.docs.map((d) => d.data().date));
-  if (nights.some((n) => takenDates.has(n))) throw new Error('overlap');
-
-  const batch = writeBatch(db);
-  batch.update(doc(db, 'reservations', r.id), { status: 'confirmed' });
-  nights.forEach((date) => {
-    batch.set(doc(db, 'bookedNights', `${r.propertyId}_${date}`), {
-      propertyId: r.propertyId,
-      ownerId: r.ownerId,
-      guestId: r.guestId,
-      reservationId: r.id,
-      date,
-    });
-  });
-  batch.set(doc(collection(db, 'notifications')), message(r, r.guestId, 'reservation_confirmed'));
-  try {
-    await batch.commit();
-  } catch (err) {
-    // A night that was taken a moment ago makes Firestore reject the whole batch.
-    if (err?.code === 'permission-denied') throw new Error('overlap');
-    throw err;
-  }
-}
-
-export async function declineReservation(r) {
-  const batch = writeBatch(db);
-  batch.update(doc(db, 'reservations', r.id), { status: 'declined' });
-  batch.set(doc(collection(db, 'notifications')), message(r, r.guestId, 'reservation_declined'));
-  await batch.commit();
-}
-
-// Guest (by = 'guest') or host (by = 'host') cancels. Confirmed nights are freed
-// so other guests can book them again, and the other person is notified.
-export async function cancelReservation(r, by) {
-  const batch = writeBatch(db);
-  batch.update(doc(db, 'reservations', r.id), {
-    status: 'cancelled',
-    cancelledAt: serverTimestamp(),
-    cancelledBy: by,
-  });
-  if (r.status === 'confirmed') {
-    const locks = await getDocs(query(collection(db, 'bookedNights'), where('reservationId', '==', r.id)));
-    locks.forEach((d) => batch.delete(d.ref));
-  }
-  batch.set(
-    doc(collection(db, 'notifications')),
-    message(r, by === 'guest' ? r.ownerId : r.guestId, 'reservation_cancelled', { cancelledBy: by })
-  );
-  await batch.commit();
-}
-
 /* ---------- payment (Stripe, through the /api functions) ---------- */
 
 export const PAYMENT_LABELS = {
@@ -274,11 +172,20 @@ async function callApi(path, body) {
   return data;
 }
 
-// Sends the guest to Stripe's payment page. They come back to My bookings afterwards.
-export async function startCheckout(reservation) {
-  const { url } = await callApi('create-checkout-session', { reservationId: reservation.id });
+// purpose: 'booking' | 'cancellation' | 'damage'. They come back to My bookings afterwards.
+export async function startCheckout(reservation, purpose = 'booking') {
+  const { url } = await callApi('create-checkout-session', { reservationId: reservation.id, purpose });
   window.location.assign(url);
 }
 
 // Full refund for a cancelled booking that was paid.
 export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });
+
+export {
+  todayISO, nightsBetween, nightsCount, computeQuote, hostPayout,
+  cancellationFee, reservationCharges, amountDue, amountPaid,
+} from './Pricing';
+export {
+  createReservation, confirmReservation, declineReservation, cancelReservation,
+  requestCancellationFee, reportDamage,
+} from './Reservation';

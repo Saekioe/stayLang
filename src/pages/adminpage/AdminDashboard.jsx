@@ -40,7 +40,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { useAuth } from "../../auth/Auth";
 import { colors } from "./adminUi";
-import adminLogo from "../../assets/adminLogo.png";
+import adminLogo from "../../assets/logo.png";
 
 import Overview from "./Overview";
 import UserManagement from "./UserManagement";
@@ -134,13 +134,13 @@ function SidebarContent({ isActive, onNavigate, onLogout }) {
           gap: 1.25,
           px: 2.5,
           pt: 3,
-          pb: 3,
+          pb: 2,
         }}
       >
         <Box
           component="img"
           src={adminLogo}
-          alt="StayLang"
+          alt="Pahinga Logo"
           sx={{ width: 34, height: 34, objectFit: "contain" }}
         />
         <Box>
@@ -152,7 +152,7 @@ function SidebarContent({ isActive, onNavigate, onLogout }) {
               lineHeight: 1.1,
             }}
           >
-            StayLang
+            Pahinga
           </Typography>
           <Typography
             sx={{
@@ -162,22 +162,14 @@ function SidebarContent({ isActive, onNavigate, onLogout }) {
               textTransform: "uppercase",
             }}
           >
-            Admin Control Panel
+            Admin Control
           </Typography>
+          
         </Box>
+        
       </Box>
-
-      <Typography
-        sx={{
-          fontSize: 10,
-          letterSpacing: "0.08em",
-          color: colors.muted,
-          px: 3,
-          mb: 1,
-        }}
-      >
-        WORKSPACE
-      </Typography>
+      <Divider sx={{ my: 2, borderColor: '#e4e4e4' }} />
+  
 
       {/* Navigation */}
       <List
@@ -515,7 +507,7 @@ export default function AdminDashboard() {
             bgcolor: "#FFFFFF",
           }}
         >
-          Log out of StayLang Admin?
+          Log out of Pahinga Admin?
         </DialogTitle>
 
         <DialogContent>

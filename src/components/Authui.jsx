@@ -57,7 +57,7 @@ export function AuthCard({ title, subtitle, children }) {
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.13), rgba(29, 23, 23, 0.9)), url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <Paper elevation={0} sx={{ width: '100%', maxWidth: 480, p: 4, borderRadius: '16px' }}>
-        <Box component="img" src={logo} alt="StayLang Logo" sx={{ height: 40, display: 'block', mx: 'auto', mb: 1.5 }} />
+        <Box component="img" src={logo} alt="Pahinga Logo" sx={{ height: 40, display: 'block', mx: 'auto', mb: 1.5 }} />
         <Typography variant="h5" component="h1" sx={{ textAlign: 'center', fontWeight: 600, mt: 0.5, color: 'text.primary' }}>
           {title}
         </Typography>

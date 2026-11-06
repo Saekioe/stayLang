@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, Navigate, useSearchParams } from 'react-router-dom';
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -11,8 +11,12 @@ import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import {
-  PAYMENT_LABELS, cancelReservation, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf, todayISO,
+  PAYMENT_LABELS, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf,
 } from '../dataqueries/Booking';
+import {
+  CANCELLATION_TIERS, CHARGE_LABELS, amountPaid, cancellationFee, reservationCharges, todayISO,
+} from '../dataqueries/Pricing';
+import { cancelReservation, requestCancellationFee } from '../dataqueries/Reservation';
 
 // Set to true to let guests review only after their check-out date has passed.
 const ONLY_AFTER_CHECKOUT = true;
@@ -59,6 +63,15 @@ const tabOf = (b) => {
   return 'upcoming'; // pending, or confirmed and not finished yet
 };
 
+const guestSummary = (b) => {
+  const adults = b.adults ?? b.guests ?? 1;
+  const parts = [plural(adults, 'adult')];
+  if (b.children) parts.push(`${b.children} ${b.children === 1 ? 'child' : 'children'}`);
+  if (b.infants) parts.push(plural(b.infants, 'infant'));
+  if (b.pets) parts.push(plural(b.pets, 'pet'));
+  return parts.join(', ');
+};
+
 function Line({ label, value, bold }) {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, py: 0.5 }}>
@@ -93,11 +106,35 @@ export default function MyBookings() {
   const [tab, setTab] = useState('all');
   const [selected, setSelected] = useState(null);
 
+  // cancel dialog (shows the fee before the guest confirms)
+  const [cancelTarget, setCancelTarget] = useState(null);
+
   // review dialog
   const [reviewing, setReviewing] = useState(null);
   const [form, setForm] = useState({ rating: 0, text: '' });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const finalizing = useRef(new Set());
+
+  // Cancel for real: status, dates and notifications change in one transaction, then refund if paid.
+  const finishCancellation = async (b) => {
+    try {
+      await cancelReservation(b, 'guest');
+    } catch {
+      finalizing.current.delete(b.id);
+      setError('We could not cancel that booking. Please try again.');
+      return false;
+    }
+    if (paymentStatusOf(b) === 'paid') {
+      try {
+        await refundReservation(b);
+      } catch {
+        setError('Your booking was cancelled, but the refund could not be processed yet. Use "Retry refund" on the booking.');
+      }
+    }
+    return true;
+  };
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -127,16 +164,25 @@ export default function MyBookings() {
     };
   }, [uid]);
 
+  // Once the cancellation fee shows as paid (set by your payment webhook), finish the cancellation.
+  useEffect(() => {
+    bookings.forEach((b) => {
+      if (b.status === 'confirmed' && b.cancellationFeeStatus === 'paid' && !finalizing.current.has(b.id)) {
+        finalizing.current.add(b.id);
+        finishCancellation(b);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+
   const counts = useMemo(() => {
     const c = { all: bookings.length, upcoming: 0, past: 0, closed: 0 };
     bookings.forEach((b) => { c[tabOf(b)] += 1; });
     return c;
   }, [bookings]);
 
-  const spent = useMemo(
-    () => bookings.filter((b) => statusOf(b) === 'completed').reduce((sum, b) => sum + (b.total ?? 0), 0),
-    [bookings]
-  );
+  // Money actually paid: bookings, cancellation fees and damage charges
+  const spent = useMemo(() => bookings.reduce((sum, b) => sum + amountPaid(b), 0), [bookings]);
 
   if (loading) {
     return <Box sx={{ py: 12, textAlign: 'center', bgcolor: '#fff', minHeight: '100vh' }}><CircularProgress /></Box>;
@@ -145,44 +191,59 @@ export default function MyBookings() {
 
   const shown = tab === 'all' ? bookings : bookings.filter((b) => tabOf(b) === tab);
 
-  // A guest can cancel a pending or confirmed booking until the day of check-in.
-  const canCancel = (b) => (b.status === 'pending' || b.status === 'confirmed') && b.checkIn > todayISO();
+  // ----- cancelling -----
+  const cancelInfo = cancelTarget ? cancellationFee(cancelTarget) : null;
 
-  const guestSummary = (b) => {
-  const adults = b.adults ?? b.guests ?? 1;
-  const parts = [plural(adults, 'adult')];
-  if (b.children) parts.push(`${b.children} ${b.children === 1 ? 'child' : 'children'}`);
-  if (b.infants) parts.push(plural(b.infants, 'infant'));
-  if (b.pets) parts.push(plural(b.pets, 'pet'));
-  return parts.join(', ');
-};
-
-  const cancelBooking = async (b) => {
-    if (!window.confirm(`Cancel your booking at "${b.propertyTitle}"?${paymentStatusOf(b) === 'paid' ? ' You will get a full refund.' : ''}`)) return;
+  const confirmCancel = async () => {
+    const b = cancelTarget;
+    const info = cancellationFee(b);
     setError('');
     setCancellingId(b.id);
     try {
-      await cancelReservation(b, 'guest');
-    } catch {
-      setError('We could not cancel that booking. Please try again.');
-      setCancellingId('');
-      return;
-    }
-    if (paymentStatusOf(b) === 'paid') {
-      try {
-        await refundReservation(b);
-      } catch {
-        setError('Your booking was cancelled, but the refund could not be processed yet. Use "Retry refund" on the booking.');
+      if (info.fee > 0) {
+        // The booking stays active until the fee is paid. The webhook marks it paid and the effect above finishes it.
+        if (b.cancellationFeeStatus !== 'unpaid' || b.cancellationFee !== info.fee) {
+          await requestCancellationFee(b, info);
+        }
+        await startCheckout({ ...b, cancellationFee: info.fee, cancellationFeeStatus: 'unpaid' }, 'cancellation');
+        return; // leaves this page for Stripe
       }
+      await finishCancellation(b);
+      setCancelTarget(null);
+    } catch (err) {
+      setError(err.message || 'We could not start the cancellation. Please try again.');
+    } finally {
+      setCancellingId('');
     }
-    setCancellingId('');
+  };
+
+  const payCancellationFee = async (b) => {
+    setError('');
+    setPayingId(b.id);
+    try {
+      await startCheckout(b, 'cancellation');
+    } catch (err) {
+      setError(err.message);
+      setPayingId('');
+    }
   };
 
   const payNow = async (b) => {
     setError('');
     setPayingId(b.id);
     try {
-      await startCheckout(b); // leaves this page for Stripe
+      await startCheckout(b, 'booking'); // leaves this page for Stripe
+    } catch (err) {
+      setError(err.message);
+      setPayingId('');
+    }
+  };
+
+  const payDamage = async (b) => {
+    setError('');
+    setPayingId(b.id);
+    try {
+      await startCheckout(b, 'damage');
     } catch (err) {
       setError(err.message);
       setPayingId('');
@@ -201,6 +262,7 @@ export default function MyBookings() {
     }
   };
 
+  // ----- reviews -----
   const canReview = (b) =>
     b.status === 'confirmed' && (!ONLY_AFTER_CHECKOUT || b.checkOut <= todayISO());
 
@@ -265,10 +327,7 @@ export default function MyBookings() {
   // Details dialog: use the live copy so it updates if the host changes the status while it is open.
   const current = selected ? bookings.find((b) => b.id === selected.id) ?? selected : null;
   const currentInfo = current ? statusInfo[statusOf(current)] ?? statusInfo.pending : null;
-  const cleaning = current?.cleaningFee ?? 0;
-  const service = current?.serviceFee ?? 0;
-  const roomTotal = current ? (current.total ?? 0) - cleaning - service : 0;
-  const perNight = current?.nights ? roomTotal / current.nights : 0;
+  const c = current ? reservationCharges(current) : null;
 
   return (
     <Box sx={{ bgcolor: '#fff', minHeight: '100vh' }}>
@@ -297,7 +356,7 @@ export default function MyBookings() {
           <SummaryCard label="All reservations" value={counts.all} />
           <SummaryCard label="Upcoming" value={counts.upcoming} />
           <SummaryCard label="Past stays" value={counts.past} />
-          <SummaryCard label="Total spent" value={money(spent)} />
+          <SummaryCard label="Total paid" value={money(spent)} />
         </Box>
 
         <Tabs
@@ -337,6 +396,10 @@ export default function MyBookings() {
             shown.map((b) => {
               const info = statusInfo[statusOf(b)] ?? statusInfo.pending;
               const review = reviews[b.id];
+              const bc = reservationCharges(b);
+              const policy = cancellationFee(b);
+              const feeDue = b.status === 'confirmed' && b.cancellationFeeStatus === 'unpaid';
+              console.log(b.id, b.status, b.checkIn, cancellationFee(b));
               return (
                 <Box
                   key={b.id}
@@ -351,20 +414,36 @@ export default function MyBookings() {
                     <Box sx={{ minWidth: 0 }}>
                       <Typography sx={{ fontWeight: 700 }}>{b.propertyTitle}</Typography>
                       <Typography variant="body2" sx={{ color: '#7A7070' }}>
-                        {fmt(b.checkIn)} to {fmt(b.checkOut)}, {plural(b.nights ?? 0, 'night')}
+                        {fmt(b.checkIn)} to {fmt(b.checkOut)}, {plural(bc.nights, 'night')}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#7A7070' }}>
-                        {guestSummary(b)}, {money(b.total)} total
+                        {guestSummary(b)}, {money(bc.bookingTotal)} total
                       </Typography>
                       {b.status === 'cancelled' && (
                         <Typography variant="body2" sx={{ color: '#8A2E26', mt: 0.5 }}>
-                          Cancelled by {b.cancelledBy === 'host' ? 'the host' : 'you'}.
+                          Cancelled by {b.cancelledBy === 'host' ? 'the host' : b.cancelledBy === 'admin' ? 'the admin' : 'you'}.
+                          {b.cancellationFee > 0 && ` Cancellation fee ${money(bc.cancellationFee)}: ${CHARGE_LABELS[b.cancellationFeeStatus] ?? 'Unpaid'}.`}
+                        </Typography>
+                      )}
+                      {b.status === 'declined' && b.declineReason === 'dates_unavailable' && (
+                        <Typography variant="body2" sx={{ color: '#7A7070', mt: 0.5 }}>
+                          These dates are no longer available. The host confirmed another booking.
                         </Typography>
                       )}
                       {b.status === 'confirmed' && (
                         <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: paymentStatusOf(b) === 'paid' ? '#2E6B3F' : '#6B5200' }}>
                           Payment: {PAYMENT_LABELS[paymentStatusOf(b)]}
                           {paymentStatusOf(b) === 'paid' && paymentMethodLabel(b) ? ` (${paymentMethodLabel(b)})` : ''}
+                        </Typography>
+                      )}
+                      {feeDue && (
+                        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: '#8A2E26' }}>
+                          Cancellation fee of {money(bc.cancellationFee)} is due. Your booking is cancelled once it is paid.
+                        </Typography>
+                      )}
+                      {b.damageStatus && (
+                        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600, color: b.damageStatus === 'paid' ? '#2E6B3F' : '#8A2E26' }}>
+                          Damage charge {money(bc.damage)}: {CHARGE_LABELS[b.damageStatus]}
                         </Typography>
                       )}
                       {b.status === 'cancelled' && paymentStatusOf(b) === 'refunded' && (
@@ -384,12 +463,22 @@ export default function MyBookings() {
                       <Button size="small" variant="outlined" onClick={() => setSelected(b)}>
                         View details
                       </Button>
-                      {canCancel(b) && (
-                        <Button size="small" color="inherit" disabled={cancellingId === b.id} onClick={() => cancelBooking(b)}>
-                          {cancellingId === b.id ? 'Cancelling…' : 'Cancel booking'}
+                      {policy.canCancel && (
+                        <Button size="small" color="inherit" disabled={cancellingId === b.id} onClick={() => setCancelTarget(b)}>
+                          Cancel booking
                         </Button>
                       )}
-                      {b.status === 'confirmed' && paymentStatusOf(b) !== 'paid' && b.checkOut >= todayISO() && (
+                      {feeDue && (
+                        <Button size="small" variant="contained" disableElevation color="error" disabled={payingId === b.id} onClick={() => payCancellationFee(b)}>
+                          {payingId === b.id ? 'Opening…' : `Pay cancellation fee`}
+                        </Button>
+                      )}
+                      {b.damageStatus === 'unpaid' && (
+                        <Button size="small" variant="contained" disableElevation color="warning" disabled={payingId === b.id} onClick={() => payDamage(b)}>
+                          {payingId === b.id ? 'Opening…' : 'Pay damage charge'}
+                        </Button>
+                      )}
+                      {b.status === 'confirmed' && !feeDue && paymentStatusOf(b) !== 'paid' && b.checkOut >= todayISO() && (
                         <Button size="small" variant="contained" disableElevation disabled={payingId === b.id} onClick={() => payNow(b)}>
                           {payingId === b.id ? 'Opening…' : 'Pay now'}
                         </Button>
@@ -434,11 +523,67 @@ export default function MyBookings() {
         </Paper>
       </Box>
 
+      {/* Cancel booking: the fee is shown before the guest confirms */}
+      <Dialog open={Boolean(cancelTarget)} onClose={() => cancellingId === '' && setCancelTarget(null)} fullWidth maxWidth="sm" aria-labelledby="cancel-title">
+        {cancelTarget && cancelInfo && (
+          <>
+            <DialogTitle id="cancel-title" sx={{ textAlign: 'left', color: '#7A7070', fontSize: '1rem', fontWeight: 600 }}>Cancel this booking?</DialogTitle>
+            <DialogContent sx={{ textAlign: 'left' }}>
+              <Typography sx={{ fontWeight: 700 }}>{cancelTarget.propertyTitle}</Typography>
+              <Typography variant="body2" sx={{ color: '#7A7070', mb: 2 }}>
+                {fmt(cancelTarget.checkIn)} to {fmt(cancelTarget.checkOut)}, {plural(cancelInfo.days, 'day')} until check-in
+              </Typography>
+
+              {cancelTarget.status === 'confirmed' && (
+                <Box sx={{ border: '1px solid #E6E3E3', borderRadius: '10px', p: 1.5, mb: 2 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Cancellation policy</Typography>
+                  {CANCELLATION_TIERS.map((t) => {
+                    const active = t.percent === cancelInfo.percent;
+                    return (
+                      <Typography key={t.minDays} variant="body2" sx={{ fontWeight: active ? 700 : 400, color: active ? '#8A2E26' : '#7A7070' }}>
+                        {active ? '→ ' : ''}{t.label}
+                      </Typography>
+                    );
+                  })}
+                </Box>
+              )}
+
+              <Line label="Booking total" value={money(reservationCharges(cancelTarget).bookingTotal)} />
+              <Line label={`Cancellation fee (${cancelInfo.percent}%)`} value={money(cancelInfo.fee)} bold />
+
+              {cancelInfo.fee > 0 ? (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  You must pay the {money(cancelInfo.fee)} fee to finish cancelling. Your booking stays active until it is paid.
+                  {paymentStatusOf(cancelTarget) === 'paid' && ' Your booking payment is refunded in full after that.'}
+                </Alert>
+              ) : (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  No cancellation fee applies.
+                  {paymentStatusOf(cancelTarget) === 'paid' && ' Your payment will be refunded in full.'}
+                </Alert>
+              )}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button color="inherit" onClick={() => setCancelTarget(null)} disabled={cancellingId === cancelTarget.id}>
+                Keep booking
+              </Button>
+              <Button variant="contained" color="error" disableElevation onClick={confirmCancel} disabled={cancellingId === cancelTarget.id}>
+                {cancellingId === cancelTarget.id
+                  ? 'Please wait…'
+                  : cancelInfo.fee > 0
+                    ? `Pay ${money(cancelInfo.fee)} and cancel`
+                    : 'Cancel booking'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
       {/* Reservation details */}
       <Dialog open={Boolean(current)} onClose={() => setSelected(null)} fullWidth maxWidth="sm" aria-labelledby="res-title">
         {current && (
           <>
-            <DialogTitle id="res-title" sx={{ textAlign: 'left' }}>
+            <DialogTitle id="res-title" sx={{ textAlign: 'left', color: '#7A7070', fontSize: '1rem', fontWeight: 600 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                 <span>Reservation details</span>
                 <Chip label={currentInfo.label} sx={{ fontWeight: 600, ...currentInfo.sx }} />
@@ -446,28 +591,45 @@ export default function MyBookings() {
             </DialogTitle>
             <DialogContent sx={{ textAlign: 'left' }}>
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', mb: 1 }}>{current.propertyTitle}</Typography>
-
+              <Divider sx={{ my: 1.5 }} />
               <Line label="Check-in" value={fmt(current.checkIn)} />
               <Line label="Check-out" value={fmt(current.checkOut)} />
-              <Line label="Nights" value={current.nights ?? 0} />
+              <Line label="Nights" value={c.nights} />
               <Line label="Guests" value={guestSummary(current)} />
 
               <Divider sx={{ my: 1.5 }} />
               <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Price</Typography>
-              <Line
-                label={current.nights ? `${money(perNight)} x ${plural(current.nights, 'night')}` : 'Stay'}
-                value={money(roomTotal)}
-              />
-              {cleaning > 0 && <Line label="Cleaning fee" value={money(cleaning)} />}
-              {service > 0 && <Line label="Service fee" value={money(service)} />}
-              <Line label="Total" value={money(current.total)} bold />
+              <Line label={`${money(c.nightlyRate)} x ${plural(c.nights, 'night')}`} value={money(c.subtotal)} />
+              {c.cleaningFee > 0 && <Line label="Cleaning fee" value={money(c.cleaningFee)} />}
+              {c.serviceFee > 0 && <Line label={`Service fee (${c.serviceFeePercent}%)`} value={money(c.serviceFee)} />}
+              <Line label="Booking total" value={money(c.bookingTotal)} bold />
+              {c.cancellationFee > 0 && (
+                <Line label={`Cancellation fee (${CHARGE_LABELS[current.cancellationFeeStatus] ?? 'Unpaid'})`} value={money(c.cancellationFee)} />
+              )}
+              {c.damage > 0 && <Line label={`Damage charge (${CHARGE_LABELS[current.damageStatus]})`} value={money(c.damage)} />}
+              {(c.cancellationFee > 0 || c.damage > 0) && <Line label="All charges" value={money(c.finalTotal)} bold />}
               {(current.status === 'confirmed' || paymentStatusOf(current) !== 'unpaid') && (
                 <Line
-                  label="Payment"
+                  label="Booking payment"
                   value={`${PAYMENT_LABELS[paymentStatusOf(current)]}${
                     paymentStatusOf(current) === 'paid' && paymentMethodLabel(current) ? ` (${paymentMethodLabel(current)})` : ''
                   }`}
                 />
+              )}
+
+              {current.damageStatus && (
+                <>
+                  <Divider sx={{ my: 1.5 }} />
+                  <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Damage report</Typography>
+                  <Typography variant="body2">{current.damageDescription}</Typography>
+                  {(current.damagePhotos ?? []).length > 0 && (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                      {current.damagePhotos.map((src, i) => (
+                        <Box key={i} component="img" src={src} alt={`Damage ${i + 1}`} sx={{ width: 96, height: 72, objectFit: 'cover', borderRadius: '8px', border: '1px solid #E6E3E3' }} />
+                      ))}
+                    </Box>
+                  )}
+                </>
               )}
 
               <Divider sx={{ my: 1.5 }} />
@@ -480,12 +642,16 @@ export default function MyBookings() {
 
               {current.status === 'cancelled' && (
                 <Alert severity="error" sx={{ mt: 2 }}>
-                  Cancelled by {current.cancelledBy === 'host' ? 'the host' : 'you'}
+                  Cancelled by {current.cancelledBy === 'host' ? 'the host' : current.cancelledBy === 'admin' ? 'the admin' : 'you'}
                   {fmtStamp(current.cancelledAt) ? ` on ${fmtStamp(current.cancelledAt)}` : ''}.
                 </Alert>
               )}
               {current.status === 'declined' && (
-                <Alert severity="info" sx={{ mt: 2 }}>The host declined this request.</Alert>
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  {current.declineReason === 'dates_unavailable'
+                    ? 'These dates are no longer available. The host confirmed another booking.'
+                    : 'The host declined this request.'}
+                </Alert>
               )}
               {current.status === 'pending' && (
                 <Alert severity="warning" sx={{ mt: 2 }}>Waiting for the host to confirm your request.</Alert>

@@ -6,8 +6,6 @@ import {
   Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import {
@@ -18,20 +16,13 @@ import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import ListingForm from '../components/Listingform';
 import AvailabilityCalendar from '../components/AvailabilityCalendar';
-import {
-  PAYMENT_LABELS, STATUS_LABELS, cancelReservation, confirmReservation, declineReservation, hostPayout, money,
-  paymentStatusOf, refundReservation, statusOf, todayISO,
-} from '../dataqueries/Booking';
+
 import HostApplication from '../components/HostApplication';
 import { useHostApplication } from '../dataqueries/Host';
+import { money } from '../dataqueries/Booking';
+import { hostPayout, todayISO } from '../dataqueries/Pricing';
+import IncomingGuests from '../components/IncomingGuests';
 
-const statusStyle = {
-  pending: { bgcolor: '#FBF1C0', color: '#6B5200' },
-  confirmed: { bgcolor: '#E8F1F4', color: '#2F5E70' },
-  declined: { bgcolor: '#EFECEC', color: '#7A7070' },
-  cancelled: { bgcolor: '#F8E1DF', color: '#8A2E26' },
-  completed: { bgcolor: '#E3EAF7', color: '#27437A' },
-};
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -388,107 +379,6 @@ function PropertyRow({ p, newRequests, onEdit, onDelete }) {
   );
 }
 
-function RequestRow({ r, review, conflict, onStatus, onCancel, onReply }) {
-  const pending = r.status === 'pending';
-  const placed = r.createdAt?.toDate
-    ? r.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-    : '';
-  return (
-    <Box sx={{ ...rowSx, bgcolor: pending ? '#FFFBE8' : 'transparent' }}>
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1.2fr 1.5fr auto' },
-          gap: { xs: 1.5, md: 3 },
-          alignItems: 'center',
-        }}
-      >
-        {/* The booker */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-          <Avatar sx={{ bgcolor: '#E8F1F4', color: '#2F5E70', fontWeight: 700 }}></Avatar>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 700 }} noWrap>{r.guestName}</Typography>
-            <Typography variant="body2" sx={{ color: '#7A7070' }} noWrap>
-              <Link href={`mailto:${r.guestEmail}`} underline="hover" color="inherit">{r.guestEmail}</Link>
-            </Typography>
-            {r.guestPhone && (
-              <Typography variant="body2" sx={{ color: '#7A7070' }} noWrap>
-                <Link href={`tel:${r.guestPhone}`} underline="hover" color="inherit">{r.guestPhone}</Link>
-              </Typography>
-            )}
-          </Box>
-        </Box>
-
-        {/* The booking */}
-        <Box>
-          <Typography sx={{ fontWeight: 600 }}>{r.propertyTitle}</Typography>
-          <Typography variant="body2" sx={{ color: '#7A7070' }}>
-            {fmt(r.checkIn)} to {fmt(r.checkOut)}, {plural(r.nights ?? 0, 'night')}
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#7A7070' }}>
-            {guestSummary(r)}, {money(r.total)} total{placed ? `, requested ${placed}` : ''}
-          </Typography>
-          {(r.status === 'confirmed' || paymentStatusOf(r) !== 'unpaid') && (
-            <Typography variant="body2" sx={{ fontWeight: 600, color: paymentStatusOf(r) === 'unpaid' ? '#6B5200' : '#2E6B3F' }}>
-              {PAYMENT_LABELS[paymentStatusOf(r)]}
-            </Typography>
-          )}
-          {pending && conflict && (
-            <Typography variant="body2" sx={{ color: '#8A2E26', fontWeight: 600 }}>
-              These dates are already booked by another guest. You can only decline this request.
-            </Typography>
-          )}
-        </Box>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Chip size="small" label={STATUS_LABELS[statusOf(r)] ?? r.status} sx={{ fontWeight: 600, ...statusStyle[statusOf(r)] }} />
-          {r.status === 'confirmed' && r.checkIn > todayISO() && (
-            <Button size="small" color="inherit" onClick={() => onCancel(r)}>
-              Cancel booking
-            </Button>
-          )}
-          {pending && (
-            <>
-              <Button size="small" variant="contained" disableElevation startIcon={<CheckIcon />} disabled={conflict} onClick={() => onStatus(r, 'confirmed')}>
-                Confirm
-              </Button>
-              <Button size="small" color="inherit" startIcon={<CloseIcon />} onClick={() => onStatus(r, 'declined')}>
-                Decline
-              </Button>
-            </>
-          )}
-        </Box>
-      </Box>
-
-      {/* The booker's review and your reply */}
-      {r.status === 'confirmed' && (
-        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed #E6E3E3' }}>
-          {review ? (
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="body2" sx={{ color: '#7A7070', fontWeight: 600 }}>
-                  Review from {r.guestName}
-                </Typography>
-                <Rating value={review.rating} readOnly size="small" />
-                {review.text && <Typography variant="body2" sx={{ mt: 0.25 }}>{review.text}</Typography>}
-                {review.hostReply && (
-                  <Typography variant="body2" sx={{ mt: 0.5, color: '#2F5E70' }}>
-                    Your reply: {review.hostReply}
-                  </Typography>
-                )}
-              </Box>
-              <Button size="small" onClick={() => onReply(review)}>
-                {review.hostReply ? 'Edit reply' : 'Reply'}
-              </Button>
-            </Box>
-          ) : (
-            <Typography variant="body2" sx={{ color: '#7A7070' }}>No review from this guest yet.</Typography>
-          )}
-        </Box>
-      )}
-    </Box>
-  );
-}
 
 // ---------- ratings and reviews from your guests ----------
 function ReviewsPanel({ properties, reviews, onReply }) {
@@ -706,51 +596,8 @@ export default function MyProperty() {
     await deleteDoc(doc(db, 'properties', p.id)).catch(() => setError('Could not delete that listing.'));
   };
 
-  // Confirm or decline a request. Confirming books the nights, so it can fail
-  // if another confirmed booking already has any of those dates.
-  const setStatus = async (r, status) => {
-    try {
-      if (status === 'confirmed') await confirmReservation(r);
-      else await declineReservation(r);
-    } catch (err) {
-      setError(
-        err.message === 'overlap'
-          ? 'Those dates are not available (already booked or blocked), so this request cannot be confirmed. Decline it, open the dates, or cancel the other booking first.'
-          : 'Could not update that reservation.'
-      );
-    }
-  };
 
-  const cancelBooking = async (r) => {
-    if (!window.confirm(`Cancel ${r.guestName}'s booking at "${r.propertyTitle}"? The guest will be notified and the dates open up again.`)) return;
-    try {
-      await cancelReservation(r, 'host');
-    } catch {
-      setError('Could not cancel that booking. Please try again.');
-      return;
-    }
-    // A paid booking is refunded in full when the host cancels it.
-    if (paymentStatusOf(r) === 'paid') {
-      try {
-        await refundReservation(r);
-      } catch {
-        setError('The booking was cancelled, but the refund could not be processed. The guest can retry it from My bookings.');
-      }
-    }
-  };
 
-  // A pending request is in conflict once another request for the same place and
-  // overlapping dates has been confirmed. Pending requests never block each other.
-  const hasConflict = (r) =>
-    r.status === 'pending' &&
-    reservations.some(
-      (o) =>
-        o.id !== r.id &&
-        o.propertyId === r.propertyId &&
-        o.status === 'confirmed' &&
-        o.checkIn < r.checkOut &&
-        o.checkOut > r.checkIn
-    );
 
   const requestsFor = (id) => reservations.filter((r) => r.propertyId === id && r.status === 'pending').length;
   const reviewsByReservation = Object.fromEntries(reviews.map((rv) => [rv.id, rv]));
@@ -793,7 +640,7 @@ export default function MyProperty() {
           <>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 3 }}>
               <Box>
-                <Typography sx={{ color: '#7A7070', fontWeight: 600, textAlign: 'left' }}>StayLang Host</Typography>
+                <Typography sx={{ color: '#7A7070', fontWeight: 600, textAlign: 'left' }}>Pahinga Host</Typography>
                 <Typography
                   component="h1"
                   sx={{ color: 'black', fontSize: { xs: '2rem', md: '2.6rem' }, lineHeight: 1.1, mt: 0.5, textAlign: 'left' }}
@@ -894,26 +741,14 @@ export default function MyProperty() {
                 )}
 
                 {tab === 2 && (
-                  <Paper elevation={0} sx={surfaceSx}>
-                    {reservations.length === 0 ? (
-                      <EmptyState
-                        title="No booking requests yet"
-                        text="When a guest requests one of your places, they will show up here for you to confirm or decline."
-                      />
-                    ) : (
-                      reservations.map((r) => (
-                        <RequestRow
-                          key={r.id}
-                          r={r}
-                          review={reviewsByReservation[r.id]}
-                          conflict={hasConflict(r)}
-                          onStatus={setStatus}
-                          onCancel={cancelBooking}
-                          onReply={openReply}
-                        />
-                      ))
-                    )}
-                  </Paper>
+                  <IncomingGuests
+                    properties={properties}
+                    reservations={reservations}
+                    reviewsByReservation={reviewsByReservation}
+                    onReply={openReply}
+                    onError={setError}
+                    onNotice={setNotice}
+                  />
                 )}
 
                 {tab === 3 && <ReviewsPanel properties={properties} reviews={reviews} onReply={openReply} />}
