@@ -11,6 +11,7 @@ import {
   IconButton,
   Typography,
   Collapse,
+  Rating,
 } from '@mui/material';
 
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -32,7 +33,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import { money, useBookedNights, usePlatformSettings } from '../dataqueries/Booking';
-import { computeQuote, nightsBetween, nightsCount } from '../dataqueries/Pricing';
+import { CANCELLATION_TIERS, computeQuote, nightsBetween, nightsCount } from '../dataqueries/Pricing';
 import { createReservation } from '../dataqueries/Reservation';
 import { useAuth } from '../auth/Auth';
 import { usePropertyReviews } from '../dataqueries/Data';
@@ -107,6 +108,7 @@ function Details({ place, onClose }) {
   const [saved, setSaved] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
@@ -118,6 +120,15 @@ function Details({ place, onClose }) {
   const [busy, setBusy] = useState(false);
 
   const reviews = usePropertyReviews(place.id);
+  const reviewCount = reviews.length;
+  const averageRating = reviewCount
+    ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / reviewCount
+    : null;
+  const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 3);
+  const reviewDate = (ts) =>
+    ts?.toDate
+      ? ts.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
 
   const images = place.images?.length
     ? place.images
@@ -589,6 +600,61 @@ function Details({ place, onClose }) {
             </Box>
           )}
 
+          {/* Reviews */}
+          <Box sx={{ my: 1, mt: 3, borderBottom: '1px solid #DDDDDD', pb: 1 }}>
+            <Typography sx={{ fontSize: '0.82rem' }}>- Reviews</Typography>
+          </Box>
+
+          {reviewCount === 0 ? (
+            <Typography sx={{ fontSize: '0.8rem', color: '#777777' }}>
+              No reviews yet. Guests can review this place after their stay.
+            </Typography>
+          ) : (
+            <>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Rating value={averageRating} precision={0.1} readOnly size="small" />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                  {averageRating.toFixed(1)}
+                </Typography>
+                <Typography sx={{ fontSize: '0.78rem', color: '#777777' }}>
+                  ({plural(reviewCount, 'review')})
+                </Typography>
+              </Box>
+
+              {visibleReviews.map((r) => (
+                <Box key={r.id} sx={{ py: 1.25, borderTop: '1px solid #E5E5E5' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontSize: '0.82rem', fontWeight: 600 }}>{r.guestName || 'Guest'}</Typography>
+                    <Typography sx={{ fontSize: '0.72rem', color: '#999999' }}>{reviewDate(r.createdAt)}</Typography>
+                  </Box>
+                  <Rating value={Number(r.rating) || 0} readOnly size="small" />
+                  {r.text && (
+                    <Typography sx={{ fontSize: '0.8rem', color: '#555B65', mt: 0.25, whiteSpace: 'pre-line' }}>
+                      {r.text}
+                    </Typography>
+                  )}
+                  {r.hostReply && (
+                    <Box sx={{ mt: 0.75, pl: 1.5, borderLeft: '3px solid #DDDDDD' }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#777777' }}>
+                        Reply from the host
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.78rem', color: '#555B65' }}>{r.hostReply}</Typography>
+                    </Box>
+                  )}
+                </Box>
+              ))}
+
+              {reviewCount > 3 && (
+                <Button
+                  onClick={() => setShowAllReviews((v) => !v)}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem', p: 0, minWidth: 0, color: '#454545' }}
+                >
+                  {showAllReviews ? 'Show fewer reviews' : `Show all ${reviewCount} reviews`}
+                </Button>
+              )}
+            </>
+          )}
+
           {/* Host */}
           {place.host && (
             <Box
@@ -695,7 +761,7 @@ function Details({ place, onClose }) {
               }}
             >
               <Typography sx={{ fontSize: '0.68rem' }}>
-                No cancellation policy once confirmed.
+                Cancellation fees may apply once confirmed.
               </Typography>
             </Box>
 
@@ -716,6 +782,19 @@ function Details({ place, onClose }) {
                 Payment details confirmed later
               </Typography>
             </Box>
+          </Box>
+
+          {/* Cancellation policy (same tiers the server and the rules enforce) */}
+          <Box sx={{ mb: 2.5, fontSize: '0.72rem', color: '#555555' }}>
+            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.5 }}>Cancellation policy</Typography>
+            {CANCELLATION_TIERS.map((t) => (
+              <Typography key={t.minDays} sx={{ fontSize: '0.72rem', color: '#555555' }}>
+                {t.label}
+              </Typography>
+            ))}
+            <Typography sx={{ fontSize: '0.72rem', color: '#555555' }}>
+              A request the host has not confirmed yet can be withdrawn for free.
+            </Typography>
           </Box>
 
           {/* DATE SELECTION */}

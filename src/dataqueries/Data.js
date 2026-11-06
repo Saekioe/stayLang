@@ -172,7 +172,8 @@ export function usePropertyReviews(propertyId) {
       (snap) => {
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         list.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-        setReviews(list);
+        // Reviews the admin hid are not shown to guests (the rules still let anyone read them)
+        setReviews(list.filter((r) => !r.hidden));
       },
       () => setReviews([])
     );

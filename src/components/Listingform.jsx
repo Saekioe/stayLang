@@ -509,7 +509,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           <Box sx={cardSx}>
             <SectionTitle icon={LocationOnIcon} title="Address" />
             <Typography sx={hintSx}>
-              The exact address is checked by our team. Guests only see it after their booking is confirmed.
+              The exact address is checked by our team and shown on your listing page, so guests know where the place is.
             </Typography>
             <FormField label="Street / Building / Unit" placeholder="e.g., Unit 12B, Sunrise Tower, Ayala Ave." value={form.street} onChange={set('street')} />
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
