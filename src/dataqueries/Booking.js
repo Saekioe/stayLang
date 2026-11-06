@@ -37,7 +37,9 @@ export function usePlatformSettings() {
         doc(db, 'settings', 'platform'),
         (snap) => {
           if (!snap.exists()) return;
-          const pct = Number(snap.data().serviceFeePercent);
+          // `guestFee` is what the admin saves in Settings; `serviceFeePercent` is the older name.
+          const d = snap.data();
+          const pct = Number(d.guestFee ?? d.serviceFeePercent);
           if (Number.isFinite(pct) && pct >= 0) setSettings({ serviceFeePercent: pct });
         },
         () => {}

@@ -17,11 +17,12 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import NavigationBar from '../components/NavigationBar';
 import { PlaceGrid } from '../components/Places';
-import { usePlaces } from '../dataqueries/Data';
+import { usePlaces, usePropertyTypes } from '../dataqueries/Data';
 import { nightsBetween, todayISO, useUnavailablePropertyIds } from '../dataqueries/Booking';
 
 export default function FindPlaces() {
   const { places, error } = usePlaces();
+  const adminTypes = usePropertyTypes();
   const [query, setQuery] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [propertyType, setPropertyType] = useState('all');
@@ -34,8 +35,8 @@ export default function FindPlaces() {
 
   const q = query.trim().toLowerCase();
 
-  // Extract unique property types dynamically from places list
-  const propertyTypes = ['all', ...new Set(places.map((p) => p.type).filter(Boolean))];
+  // The admin's categories, plus any older listing type that is no longer in that list
+  const propertyTypes = ['all', ...new Set([...adminTypes, ...places.map((p) => p.type).filter(Boolean)])];
 
   const results = places.filter((p) => {
     const matchesQuery = `${p.name} ${p.city}`.toLowerCase().includes(q);

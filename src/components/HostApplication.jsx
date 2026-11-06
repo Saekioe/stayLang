@@ -5,7 +5,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { useAuth } from '../auth/Auth';
 import { compressImage, submitHostApplication } from '../dataqueries/Host';
-import { propertyTypes } from '../dataqueries/Data';
+import { usePropertyTypes } from '../dataqueries/Data';
 
 const ID_TYPES = ['Passport', "Driver's license", 'PhilSys National ID', 'UMID', 'Postal ID', "Voter's ID"];
 const ROLES = [
@@ -112,6 +112,7 @@ function validate(f, agreed) {
 
 export default function HostApplication({ application }) {
   const { user, profile } = useAuth();
+  const propertyTypes = usePropertyTypes();
   const status = application?.status;
 
   const [form, setForm] = useState(() => ({
@@ -220,7 +221,10 @@ export default function HostApplication({ application }) {
           />
           <Field label="City of the property" value={form.propertyCity} onChange={set('propertyCity')} />
           <Field label="Property type" select value={form.propertyType} onChange={set('propertyType')}>
-            {propertyTypes.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            {(form.propertyType && !propertyTypes.includes(form.propertyType)
+              ? [form.propertyType, ...propertyTypes]
+              : propertyTypes
+            ).map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
           </Field>
           <Field
             label="About you and your hosting plans"

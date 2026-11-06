@@ -817,6 +817,15 @@ function Details({ place, onClose }) {
                   onChange={(d) => changeParty('infants', d)}
                 />
               )}
+              {limits.pets > 0 && (
+                <GuestCounter
+                  label="Pets"
+                  hint={`Up to ${plural(limits.pets, 'pet')} (not counted as guests)`}
+                  value={party.pets}
+                  canAdd={canAdd('pets')}
+                  onChange={(d) => changeParty('pets', d)}
+                />
+              )}
               <Typography sx={{ fontSize: '0.72rem', color: '#777777', pb: 1 }}>
                 This place fits up to {plural(capacity, 'guest')} (adults and children).
               </Typography>

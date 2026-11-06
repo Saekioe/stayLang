@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert, Box, Button, Checkbox, Chip, FormControlLabel, IconButton, InputAdornment, MenuItem,
   Switch, Tab, Tabs, TextField, Typography,
@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
-import { amenityOptions, propertyTypes } from '../dataqueries/Data';
+import { amenityOptions, usePropertyTypes } from '../dataqueries/Data';
 
 const MAX_IMAGES = 4;
 const MIN_IMAGES = 3;
@@ -80,7 +80,7 @@ function compressImage(file, maxSize = 800, quality = 0.6) {
 }
 
 const empty = {
-  title: '', type: 'Apartment', placeType: 'Entire place', description: '',
+  title: '', type: '', placeType: 'Entire place', description: '', hostBio: '',
   street: '', barangay: '', city: '', province: '', postalCode: '',
   maxAdults: '', maxChildren: '0', maxInfants: '0', petsAllowed: false, maxPets: '1',
   bedrooms: '', beds: '', baths: '',
@@ -99,6 +99,7 @@ const toNum = (v, fallback = 0) => (v === '' || Number.isNaN(Number(v)) ? fallba
 function validate(f, { needsProof }) {
   const bad = (tab, message) => ({ tab, message });
   if (!f.title.trim()) return bad(0, 'Enter a property title.');
+  if (!f.type) return bad(0, 'Choose a property type.');
   if (!f.street.trim()) return bad(0, 'Enter the street address or building name.');
   if (!f.barangay.trim()) return bad(0, 'Enter the barangay.');
   if (!f.city.trim()) return bad(0, 'Enter the city.');
@@ -178,7 +179,8 @@ const cardSx = {
 const hintSx = { fontSize: '0.78rem', color: '#64748B', mt: -1.5, mb: 2 };
 
 export default function ListingForm({ initial, onDone, onCancel }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const propertyTypes = usePropertyTypes();
   const isEdit = Boolean(initial?.id);
   const wasRejected = initial?.verificationStatus === 'rejected';
   const [activeTab, setActiveTab] = useState(0);
@@ -189,6 +191,7 @@ export default function ListingForm({ initial, onDone, onCancel }) {
           ...empty,
           ...initial,
           placeType: initial.placeType ?? 'Entire place',
+          hostBio: initial.hostBio ?? '',
           street: initial.street ?? '',
           barangay: initial.barangay ?? '',
           province: initial.province ?? '',
@@ -225,6 +228,16 @@ export default function ListingForm({ initial, onDone, onCancel }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+
+  // A new listing starts on the first category the admin offers.
+  useEffect(() => {
+    if (!isEdit && !form.type && propertyTypes.length) {
+      setForm((f) => (f.type ? f : { ...f, type: propertyTypes[0] }));
+    }
+  }, [isEdit, form.type, propertyTypes]);
+
+  // An older listing may use a category the admin has since removed. Keep it selectable.
+  const typeOptions = form.type && !propertyTypes.includes(form.type) ? [form.type, ...propertyTypes] : propertyTypes;
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const setBool = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.checked }));
@@ -311,6 +324,11 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       type: form.type,
       placeType: form.placeType,
       description: form.description.trim(),
+      // Shown on the property page ("Hosted by ..."): first name and last initial, like reviews
+      hostName: profile
+        ? `${profile.firstName ?? ''} ${profile.lastName?.charAt(0) ?? ''}.`.replace(/ \.$/, '').trim()
+        : user.displayName || '',
+      hostBio: form.hostBio.trim(),
       street: form.street.trim(),
       barangay: form.barangay.trim(),
       city: form.city.trim(),
@@ -469,13 +487,23 @@ export default function ListingForm({ initial, onDone, onCancel }) {
             <FormField label="Property Title" placeholder="e.g., Cozy Modern Studio in Makati" value={form.title} onChange={set('title')} />
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
               <FormField label="Property Type" select value={form.type} onChange={set('type')}>
-                {propertyTypes.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                {typeOptions.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
               </FormField>
               <FormField label="What will guests have?" select value={form.placeType} onChange={set('placeType')}>
                 {PLACE_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
               </FormField>
             </Box>
             <FormField label="About this Space" placeholder="Describe your property, the neighborhood and what makes it special..." multiline minRows={3} value={form.description} onChange={set('description')} />
+            <FormField
+              label="About you as a host (optional)"
+              placeholder="A short hello for your guests."
+              multiline
+              minRows={2}
+              required={false}
+              value={form.hostBio}
+              onChange={set('hostBio')}
+              htmlInput={{ maxLength: 300 }}
+            />
           </Box>
 
           <Box sx={cardSx}>

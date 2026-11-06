@@ -9,12 +9,15 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import { collection, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
 import { PageHeader, Panel, colors } from './adminUi';
+import { DEFAULT_PROPERTY_TYPES } from '../../dataqueries/Data';
 
-// Change this if your properties store the category under a different field name
-const CATEGORY_FIELD = 'category';
+// Listings store their category in `type` (see ListingForm).
+const CATEGORY_FIELD = 'type';
 
-const DEFAULT_CATEGORIES = ['Apartment', 'Villa', 'Cabin', 'Loft', 'Beachhouse'];
-const DEFAULT_PLATFORM = { guestFee: '0', hostFee: '0', maintenance: false, supportEmail: '' };
+// Same list hosts see until the admin saves their own.
+const DEFAULT_CATEGORIES = DEFAULT_PROPERTY_TYPES;
+// 10 matches DEFAULT_SERVICE_FEE_PERCENT in Booking.js, so the form shows the fee guests really pay.
+const DEFAULT_PLATFORM = { guestFee: '10', hostFee: '0', maintenance: false, supportEmail: '' };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Settings() {
@@ -43,7 +46,7 @@ export default function Settings() {
       if (!snap.exists()) return;
       const d = snap.data();
       const next = {
-        guestFee: String(d.guestFee ?? 0),
+        guestFee: String(d.guestFee ?? d.serviceFeePercent ?? 10),
         hostFee: String(d.hostFee ?? 0),
         maintenance: Boolean(d.maintenance),
         supportEmail: d.supportEmail ?? '',
@@ -100,7 +103,7 @@ export default function Settings() {
   };
 
   const confirmRemove = async () => {
-    if (!removeTarget) return;
+    if (!removeTarget || categories.length <= 1) return;
     await saveCategories(categories.filter((c) => c !== removeTarget), 'Category removed.');
     setRemoveTarget(null);
   };
@@ -119,13 +122,16 @@ export default function Settings() {
     setFormError('');
     setBusy(true);
     try {
+      // merge: true keeps any other field on the document. serviceFeePercent is kept equal to
+      // guestFee so the payment server and the booking screens always read the same number.
       await setDoc(doc(db, 'settings', 'platform'), {
         guestFee,
+        serviceFeePercent: guestFee,
         hostFee,
         maintenance: form.maintenance,
         supportEmail: form.supportEmail.trim(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
       setSuccess('Platform settings saved.');
     } catch (err) {
       console.error(err);
@@ -241,7 +247,7 @@ export default function Settings() {
                 type="number"
                 value={form.guestFee}
                 onChange={setField('guestFee')}
-                helperText="Added on top of the booking price"
+                helperText="Added on top of the booking price. Existing unpaid bookings keep their old price and must be requested again."
                 slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
               />
               <TextField
@@ -250,7 +256,8 @@ export default function Settings() {
                 type="number"
                 value={form.hostFee}
                 onChange={setField('hostFee')}
-                helperText="Taken from the host payout"
+                disabled
+                helperText="Not applied to host payouts yet"
                 slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
               />
             </Box>
@@ -296,7 +303,9 @@ export default function Settings() {
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14, color: colors.muted }}>
-            {removeCount > 0
+            {categories.length <= 1
+              ? 'Keep at least one category so hosts can still list a property.'
+              : removeCount > 0
               ? `${removeCount} ${removeCount === 1 ? 'property uses' : 'properties use'} this category. Move them to another category first.`
               : 'Hosts will no longer be able to pick this category for new listings.'}
           </Typography>
@@ -307,7 +316,7 @@ export default function Settings() {
             color="error"
             variant="contained"
             onClick={confirmRemove}
-            disabled={busy || removeCount > 0}
+            disabled={busy || removeCount > 0 || categories.length <= 1}
           >
             {busy ? 'Removing...' : 'Remove'}
           </Button>

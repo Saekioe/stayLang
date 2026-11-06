@@ -8,8 +8,9 @@ import { cancellationFee, computeQuote, nightsCount, round2, todayISO } from '..
 // Must match DEFAULT_SERVICE_FEE_PERCENT and usePlatformSettings() in src/dataqueries/Booking.js.
 export const DEFAULT_SERVICE_FEE_PERCENT = 10;
 
+// The admin saves the guest fee as `guestFee` (Settings page). `serviceFeePercent` is the older name.
 export const servicePercent = (settings) => {
-  const pct = Number(settings?.serviceFeePercent);
+  const pct = Number(settings?.guestFee ?? settings?.serviceFeePercent);
   return Number.isFinite(pct) && pct >= 0 ? pct : DEFAULT_SERVICE_FEE_PERCENT;
 };
 
@@ -48,7 +49,9 @@ export function buildCharge({ purpose, r, property, settings, today = todayISO()
       serviceFeePercent: servicePercent(settings),
     });
     if (nights < 1 || Math.abs(quote.total - round2(r.total)) > 0.005) {
-      throw new ChargeError('The price of this booking no longer matches the listing. Please contact the host.');
+      throw new ChargeError(
+        'The price of this booking no longer matches the listing or the current service fee. Please contact the host.'
+      );
     }
     items = [{ name: r.propertyTitle, description: `${nights} night${nights === 1 ? '' : 's'}, ${stay}`, pesos: quote.subtotal }];
     if (quote.cleaningFee > 0) items.push({ name: 'Cleaning fee', pesos: quote.cleaningFee });

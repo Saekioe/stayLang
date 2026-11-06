@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 import AcUnitIcon from '@mui/icons-material/AcUnit';
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
 import KitchenIcon from '@mui/icons-material/Kitchen';
@@ -26,9 +26,33 @@ export const amenityOptions = [
   { key: 'pets', label: 'Pets allowed', Icon: PetsIcon },
 ];
 
-export const propertyTypes = [
+// Used until the admin saves a category list (Admin > Settings > settings/categories).
+export const DEFAULT_PROPERTY_TYPES = [
   'Hotel', 'Luxury Hotel', 'Apartment', 'Condo', 'House', 'Villa', 'Cabin', 'Resort',
 ];
+export const propertyTypes = DEFAULT_PROPERTY_TYPES;
+
+// The categories the admin manages, updating live. Falls back to the default list.
+export function usePropertyTypes() {
+  const [types, setTypes] = useState(DEFAULT_PROPERTY_TYPES);
+
+  useEffect(
+    () =>
+      onSnapshot(
+        doc(db, 'settings', 'categories'),
+        (snap) => {
+          const items = snap.exists() && Array.isArray(snap.data().items)
+            ? snap.data().items.filter((t) => typeof t === 'string' && t.trim())
+            : [];
+          setTypes(items.length ? items : DEFAULT_PROPERTY_TYPES);
+        },
+        () => {}
+      ),
+    []
+  );
+
+  return types;
+}
 
 const amenityByKey = Object.fromEntries(amenityOptions.map((a) => [a.key, a]));
 
@@ -53,6 +77,21 @@ export function toPlace(snap) {
     maxStay: d.maxStay ?? null,
     cleaningFee: d.cleaningFee ?? 0,
     capacity: d.capacity ?? 1,
+    placeType: d.placeType ?? '',
+    // Guest limits set by the host (the booking panel falls back to `capacity` for older listings)
+    maxAdults: d.maxAdults ?? null,
+    maxChildren: d.maxChildren ?? null,
+    maxInfants: d.maxInfants ?? 0,
+    petsAllowed: Boolean(d.petsAllowed),
+    maxPets: d.maxPets ?? 0,
+    // House rules
+    checkInTime: d.checkInTime ?? '',
+    checkOutTime: d.checkOutTime ?? '',
+    houseRules: d.houseRules ?? '',
+    smokingAllowed: Boolean(d.smokingAllowed),
+    eventsAllowed: Boolean(d.eventsAllowed),
+    cameras: d.cameras ?? 'none',
+    safetyFeatures: d.safetyFeatures ?? [],
     bedrooms: d.bedrooms ?? 0,
     beds: d.beds ?? 1,
     baths: d.baths ?? 0,
