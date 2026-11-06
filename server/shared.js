@@ -43,16 +43,19 @@ export const nightsCount = (checkIn, checkOut) => {
 };
 
 // A message for someone's inbox (the browser rules do not apply to the server).
+// Same shape as the ones the app writes: `recipient` says whether it is for the guest or the host.
 export const notification = (r, userId, type, extra = {}) => ({
   userId,
-  reservationId: r.id,
+  recipient: userId === r.ownerId ? 'host' : 'guest',
   type,
-  propertyTitle: r.propertyTitle,
+  read: false,
+  reservationId: r.id,
+  propertyId: r.propertyId ?? null,
+  propertyTitle: r.propertyTitle ?? '',
   checkIn: r.checkIn,
   checkOut: r.checkOut,
-  nights: r.nights ?? 0,
+  nights: r.nights ?? nightsCount(r.checkIn, r.checkOut),
   total: r.total ?? 0,
-  read: false,
   createdAt: FieldValue.serverTimestamp(),
   ...extra,
 });

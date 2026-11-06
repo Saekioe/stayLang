@@ -1,51 +1,13 @@
 // POST /api/stripe-webhook   (called by Stripe, not by the browser)
-// When Stripe says a Checkout payment succeeded, mark the reservation as paid.
-import { FieldValue, db, json, notification, stripe } from '../server/shared.js';
+// When Stripe says a Checkout payment succeeded, record it on the reservation.
+import { db, json, stripe } from '../server/shared.js';
+import { markPaid } from '../server/payments.js';
 
-async function markPaid(sessionId) {
-  const session = await stripe.checkout.sessions.retrieve(sessionId, {
-    expand: ['payment_intent.latest_charge'],
-  });
-  if (session.payment_status !== 'paid') return;
-
-  const reservationId = session.client_reference_id;
-  if (!reservationId) return;
-  const ref = db.collection('reservations').doc(reservationId);
-  const snap = await ref.get();
-  if (!snap.exists) return;
-  const r = { id: snap.id, ...snap.data() };
-  if (r.paymentStatus === 'paid' || r.paymentStatus === 'refunded') return; // Stripe may resend events
-
-  const intent = session.payment_intent;
-  const details = intent?.latest_charge?.payment_method_details;
-  const paidFields = {
-    paymentMethod: details?.type ?? 'card',
-    paymentBrand: details?.card?.brand ?? null,
-    paymentLast4: details?.card?.last4 ?? null,
-    stripeSessionId: session.id,
-    stripePaymentIntentId: intent?.id ?? null,
-    amountPaid: (session.amount_total ?? 0) / 100,
-  };
-
-  // The booking was cancelled while the guest was paying: give the money back.
-  if (r.status !== 'confirmed') {
-    if (intent?.id) {
-      await stripe.refunds.create({ payment_intent: intent.id }, { idempotencyKey: `refund-${reservationId}` });
-    }
-    await ref.update({ ...paidFields, paymentStatus: 'refunded', refundedAt: FieldValue.serverTimestamp() });
-    return;
-  }
-
-  const batch = db.batch();
-  batch.update(ref, { ...paidFields, paymentStatus: 'paid', paidAt: FieldValue.serverTimestamp() });
-  batch.set(db.collection('notifications').doc(), notification(r, r.guestId, 'payment_confirmed'));
-  batch.set(db.collection('notifications').doc(), notification(r, r.ownerId, 'payment_received'));
-  await batch.commit();
-}
-
+// Only a failed BOOKING payment is recorded. A failed cancellation fee or damage
+// payment simply stays unpaid so the guest can try again.
 async function markFailed(sessionId) {
   const session = await stripe.checkout.sessions.retrieve(sessionId);
-  if (!session.client_reference_id) return;
+  if ((session.metadata?.purpose || 'booking') !== 'booking' || !session.client_reference_id) return;
   const ref = db.collection('reservations').doc(session.client_reference_id);
   const snap = await ref.get();
   if (snap.exists && (snap.data().paymentStatus ?? 'unpaid') === 'unpaid') {
@@ -58,10 +20,12 @@ export async function POST(request) {
   let event;
   try {
     event = stripe.webhooks.constructEvent(raw, request.headers.get('stripe-signature'), process.env.STRIPE_WEBHOOK_SECRET);
-  } catch {
+  } catch (err) {
+    console.error('[webhook] signature check failed. STRIPE_WEBHOOK_SECRET must match the whsec_ printed by "stripe listen":', err.message);
     return json({ error: 'Invalid signature.' }, 400);
   }
 
+  console.log(`[webhook] ${event.type}`);
   try {
     switch (event.type) {
       case 'checkout.session.completed':
@@ -74,7 +38,8 @@ export async function POST(request) {
       default:
         break;
     }
-  } catch {
+  } catch (err) {
+    console.error(`[webhook] could not process ${event.type}:`, err);
     return json({ error: 'Could not process the event.' }, 500); // Stripe will retry
   }
   return json({ received: true });

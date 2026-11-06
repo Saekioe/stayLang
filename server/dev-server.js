@@ -12,6 +12,7 @@ const routes = {
   '/api/create-checkout-session': () => import('../api/create-checkout-session.js'),
   '/api/stripe-webhook': () => import('../api/stripe-webhook.js'),
   '/api/refund-reservation': () => import('../api/refund-reservation.js'),
+  '/api/confirm-payment': () => import('../api/confirm-payment.js'),
 };
 
 // Only the headers the functions read are passed on.
