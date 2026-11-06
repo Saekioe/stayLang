@@ -155,6 +155,10 @@ function ProfileForm({ onClose, user, profile }) {
   const [firstName, setFirstName] = useState(profile?.firstName || '');
   const [lastName, setLastName] = useState(profile?.lastName || '');
   const [phone, setPhone] = useState(profile?.phone || '');
+  // Host information is only for approved hosts (the admin sets isHost)
+  const isHost = Boolean(profile?.isHost);
+  const [businessName, setBusinessName] = useState(profile?.businessName || '');
+  const [hostBio, setHostBio] = useState(profile?.hostBio || '');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -166,6 +170,10 @@ function ProfileForm({ onClose, user, profile }) {
       setErrorMsg('Enter your first and last name.');
       return;
     }
+    if (isHost && hostBio.trim().length > 500) {
+      setErrorMsg('Keep the host bio to 500 characters or fewer.');
+      return;
+    }
     setSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -173,6 +181,7 @@ function ProfileForm({ onClose, user, profile }) {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       phone: phone.trim(),
+      ...(isHost ? { businessName: businessName.trim(), hostBio: hostBio.trim() } : {}),
     };
     try {
       await setDoc(doc(db, 'users', user.uid), changes, { merge: true });
@@ -216,6 +225,36 @@ function ProfileForm({ onClose, user, profile }) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
+
+          {isHost && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Box>
+                <Box sx={{ fontWeight: 600, fontSize: '0.9rem' }}>Host information</Box>
+                <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                  Shown on your listings. New listings start with this bio.
+                </Box>
+              </Box>
+              <TextField
+                label="Business or host name (optional)"
+                size="small"
+                fullWidth
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                helperText="Leave blank to show your first name and last initial."
+              />
+              <TextField
+                label="About the host"
+                size="small"
+                fullWidth
+                multiline
+                minRows={3}
+                value={hostBio}
+                onChange={(e) => setHostBio(e.target.value)}
+                helperText={`${hostBio.trim().length}/500`}
+              />
+            </>
+          )}
 
           <Divider sx={{ my: 1 }} />
 

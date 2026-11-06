@@ -67,6 +67,7 @@ export default function HostManagement() {
  
   const decide = async (app, status) => {
     const approved = status === 'approved';
+    const deactivating = !approved && app.status === 'approved';
     if (!approved && !note.trim()) return setNoteError(true);
     setBusy(true);
     try {
@@ -84,7 +85,13 @@ export default function HostManagement() {
           .forEach((p) => batch.update(doc(db, 'properties', p.id), { published: false }));
       }
       await batch.commit();
-      setSuccess(approved ? 'Host approved. They can now publish listings.' : 'Application rejected.');
+      setSuccess(
+        approved
+          ? 'Host approved. They can now publish listings.'
+          : deactivating
+            ? 'Host deactivated. Their listings are hidden from guests.'
+            : 'Application rejected.'
+      );
       setSelected(null);
     } catch {
       setError('Could not complete administrative action.');
@@ -191,7 +198,7 @@ export default function HostManagement() {
                 fullWidth
                 multiline
                 minRows={2}
-                label="Reason (required when rejecting, shown to the applicant)"
+                label={`Reason (required when ${selected.status === 'approved' ? 'deactivating' : 'rejecting'}, shown to the host)`}
                 value={note}
                 onChange={(e) => { setNote(e.target.value); setNoteError(false); }}
                 error={noteError}
@@ -202,10 +209,10 @@ export default function HostManagement() {
             <DialogActions sx={{ px: 3, py: 2 }}>
               <Button color="inherit" onClick={() => setSelected(null)} disabled={busy}>Close</Button>
               <Button color="error" onClick={() => decide(selected, 'rejected')} disabled={busy || selected.status === 'rejected'}>
-                Reject
+                {selected.status === 'approved' ? 'Deactivate host' : 'Reject'}
               </Button>
               <Button variant="contained" color="success" onClick={() => decide(selected, 'approved')} disabled={busy || selected.status === 'approved'}>
-                Approve
+                {selected.status === 'rejected' ? 'Approve again' : 'Approve'}
               </Button>
             </DialogActions>
           </>

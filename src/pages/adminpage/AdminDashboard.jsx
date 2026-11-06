@@ -38,7 +38,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import MenuIcon from "@mui/icons-material/Menu";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
-import { useAuth } from "../../auth/Auth";
+import { useAuth, isAdminEmail } from "../../auth/Auth";
 import { colors } from "./adminUi";
 import adminLogo from "../../assets/logo.png";
 
@@ -52,7 +52,6 @@ import Report from "./Report";
 import Settings from "./Settings";
 import AdminNotifications from "./AdminNotifications";
 
-const ADMIN_EMAILS = ["admin@staylang.com"];
 const BASE = "/admin";
 const SIDEBAR_WIDTH = 230;
 const TOPBAR_HEIGHT = 70;
@@ -277,7 +276,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) return;
+    if (!user || !isAdminEmail(user.email)) return;
 
     const unsubUsers = onSnapshot(
       collection(db, "users"),
@@ -351,7 +350,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
+  if (!user || !isAdminEmail(user.email)) {
     return <Navigate to="/login" replace />;
   }
 

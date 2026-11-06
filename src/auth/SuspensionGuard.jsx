@@ -2,8 +2,7 @@ import { useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebase';
-
-const ADMIN_EMAILS = ['admin@staylang.com'];
+import { isAdminEmail } from './Auth';
 
 export default function SuspensionGuard() {
   useEffect(() => {
@@ -15,7 +14,7 @@ export default function SuspensionGuard() {
         unsubDoc = null;
       }
       if (!user) return;
-      if (ADMIN_EMAILS.includes(user.email?.toLowerCase())) return;
+      if (isAdminEmail(user.email)) return;
 
       unsubDoc = onSnapshot(
         doc(db, 'users', user.uid),

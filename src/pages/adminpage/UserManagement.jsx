@@ -40,6 +40,10 @@ export default function UserManagement() {
   const [reason, setReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({ firstName: '', lastName: '', phone: '' });
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const myId = getAuth().currentUser?.uid;
 
@@ -65,6 +69,25 @@ export default function UserManagement() {
       console.error(err);
       setError(`Could not complete action: ${err.code || err.message}`);
     }
+  };
+
+  const openEdit = (u) => {
+    setEditForm({ firstName: u.firstName ?? '', lastName: u.lastName ?? '', phone: u.phone ?? '' });
+    setEditError('');
+    setEditTarget(u);
+  };
+
+  const saveEdit = async () => {
+    const firstName = editForm.firstName.trim();
+    const lastName = editForm.lastName.trim();
+    const phone = editForm.phone.trim();
+    if (!firstName) return setEditError('Enter a first name.');
+    if (phone && phone.replace(/\D/g, '').length < 10) return setEditError('Enter a valid phone number.');
+    setEditError('');
+    setEditSaving(true);
+    await update(editTarget.id, { firstName, lastName, phone }, 'User details updated.');
+    setEditSaving(false);
+    setEditTarget(null);
   };
 
   const openSuspend = (u) => {
@@ -262,6 +285,9 @@ export default function UserManagement() {
               </Box>
             </DialogContent>
             <DialogActions>
+              {roleOf(current) !== 'admin' && current.id !== myId && (
+                <Button onClick={() => openEdit(current)}>Edit details</Button>
+              )}
               <Button
                 onClick={() => update(
                   current.id,
@@ -275,6 +301,44 @@ export default function UserManagement() {
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={Boolean(editTarget)} onClose={() => !editSaving && setEditTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontSize: 18, fontWeight: 600, color: 'black' }}>
+          Edit {editTarget?.firstName} {editTarget?.lastName}
+        </DialogTitle>
+        <DialogContent>
+          {editError && <Alert severity="error" sx={{ mb: 2 }}>{editError}</Alert>}
+          <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
+            <TextField
+              label="First name"
+              value={editForm.firstName}
+              onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+              autoFocus
+            />
+            <TextField
+              label="Last name"
+              value={editForm.lastName}
+              onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+            />
+            <TextField
+              label="Phone number"
+              type="tel"
+              value={editForm.phone}
+              onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+            />
+            <Typography sx={{ fontSize: 12, color: colors.muted }}>
+              Email and username can't be changed here because they are used to sign in.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditTarget(null)} disabled={editSaving}>Cancel</Button>
+          <Button variant="contained" onClick={saveEdit} disabled={editSaving}>
+            {editSaving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Suspend dialog */}

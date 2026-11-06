@@ -133,7 +133,17 @@ function Dashboard({ properties, reservations, reviews }) {
 
   return (
     <Box sx={{ textAlign: 'left' }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
+        <StatCard
+          label="Listings"
+          value={properties.length}
+          note={`${properties.filter((p) => p.published).length} live on the site`}
+        />
+        <StatCard
+          label="Confirmed bookings"
+          value={s.confirmed.length}
+          note="all time"
+        />
         <StatCard
           label="Earnings"
           value={money(s.earnings)}

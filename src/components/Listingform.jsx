@@ -222,7 +222,8 @@ export default function ListingForm({ initial, onDone, onCancel }) {
             ? { rights: true, accurate: true, laws: true }
             : { rights: false, accurate: false, laws: false },
         }
-      : { ...empty }
+      // New listing: start from the host info saved in Edit Profile
+      : { ...empty, hostBio: profile?.hostBio ?? '' }
   );
 
   const [error, setError] = useState('');
@@ -325,9 +326,10 @@ export default function ListingForm({ initial, onDone, onCancel }) {
       placeType: form.placeType,
       description: form.description.trim(),
       // Shown on the property page ("Hosted by ..."): first name and last initial, like reviews
-      hostName: profile
-        ? `${profile.firstName ?? ''} ${profile.lastName?.charAt(0) ?? ''}.`.replace(/ \.$/, '').trim()
-        : user.displayName || '',
+      hostName: profile?.businessName?.trim()
+        || (profile
+          ? `${profile.firstName ?? ''} ${profile.lastName?.charAt(0) ?? ''}.`.replace(/ \.$/, '').trim()
+          : user.displayName || ''),
       hostBio: form.hostBio.trim(),
       street: form.street.trim(),
       barangay: form.barangay.trim(),

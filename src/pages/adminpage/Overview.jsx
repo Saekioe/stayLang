@@ -21,7 +21,8 @@ const shortcuts = [
 ];
  
 export default function Overview({ users, properties, reservations }) {
-  const hosts = users.filter((u) => u.isHost || properties.some((p) => p.ownerId === u.id));
+  // Only approved hosts (the admin sets isHost on approval); owning a listing is not enough.
+  const hosts = users.filter((u) => u.isHost);
   const totalEarnings = reservations
     .filter((r) => r.status === 'confirmed')
     .reduce((sum, r) => sum + (r.total || 0), 0);
@@ -33,10 +34,11 @@ export default function Overview({ users, properties, reservations }) {
         subtitle="A clear view of your platform, with every management tool within reach."
       />
  
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)', xl: 'repeat(5, 1fr)' }, gap: 2, mb: 3 }}>
         <StatCard label="Total Accounts" value={users.length} caption="Platform accounts" Icon={PeopleOutlineIcon} />
-        <StatCard label="Active Hosts" value={hosts.length} caption="Active hosting accounts" Icon={HowToRegOutlinedIcon} />
+        <StatCard label="Active Hosts" value={hosts.length} caption="Approved hosting accounts" Icon={HowToRegOutlinedIcon} />
         <StatCard label="Listings" value={properties.length} caption="Properties on the platform" Icon={HomeOutlinedIcon} />
+        <StatCard label="Bookings" value={reservations.length} caption="All reservations, any status" Icon={CalendarMonthOutlinedIcon} />
         <StatCard
           label="Total Volume"
           value={money(totalEarnings)}
