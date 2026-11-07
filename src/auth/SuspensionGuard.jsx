@@ -1,8 +1,19 @@
 import { useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebase';
 import { isAdminEmail } from './Auth';
+
+// " Contact <support email> for help." if the admin has set one in Settings, otherwise nothing.
+async function supportLine() {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'platform'));
+    const email = snap.exists() ? String(snap.data().supportEmail ?? '').trim() : '';
+    return email ? ` Contact ${email} for help.` : '';
+  } catch {
+    return '';
+  }
+}
 
 export default function SuspensionGuard() {
   useEffect(() => {
@@ -23,11 +34,13 @@ export default function SuspensionGuard() {
 
           if (snap.exists() && snap.data().disabled) {
             const why = snap.data().disabledReason;
-            sessionStorage.setItem(
-              'authNotice',
-              `Your account is suspended.${why ? ` Reason: ${why}` : ''}`
-            );
-            signOut(auth);
+            supportLine().then((help) => {
+              sessionStorage.setItem(
+                'authNotice',
+                `Your account is suspended.${why ? ` Reason: ${why}` : ''}${help}`
+              );
+              signOut(auth);
+            });
             return;
           }
 
@@ -36,8 +49,10 @@ export default function SuspensionGuard() {
             const created = new Date(user.metadata.creationTime).getTime();
             const isNew = Date.now() - created < 60 * 1000;
             if (isNew) return;
-            sessionStorage.setItem('authNotice', 'This account no longer exists.');
-            signOut(auth);
+            supportLine().then((help) => {
+              sessionStorage.setItem('authNotice', `This account no longer exists.${help}`);
+              signOut(auth);
+            });
           }
         },
         () => {}

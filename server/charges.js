@@ -14,6 +14,14 @@ export const servicePercent = (settings) => {
   return Number.isFinite(pct) && pct >= 0 ? pct : DEFAULT_SERVICE_FEE_PERCENT;
 };
 
+// A booking keeps the guest service fee it was requested with, so a later change in Settings
+// never strands an unpaid booking. Older bookings without one use the current fee.
+// (firestore.rules makes sure a new booking can only be created with the fee in force at that time.)
+export const bookingFeePercent = (r, settings) => {
+  const pct = Number(r.serviceFeePercent);
+  return r.serviceFeePercent != null && Number.isFinite(pct) && pct >= 0 ? pct : servicePercent(settings);
+};
+
 export const PURPOSES = ['booking', 'cancellation', 'damage'];
 
 // An error whose message is safe to show to the guest.
@@ -46,11 +54,11 @@ export function buildCharge({ purpose, r, property, settings, today = todayISO()
       pricePerNight: property.pricePerNight,
       nights,
       cleaningFee: property.cleaningFee,
-      serviceFeePercent: servicePercent(settings),
+      serviceFeePercent: bookingFeePercent(r, settings),
     });
     if (nights < 1 || Math.abs(quote.total - round2(r.total)) > 0.005) {
       throw new ChargeError(
-        'The price of this booking no longer matches the listing or the current service fee. Please contact the host.'
+        'The price of this booking no longer matches the listing. Please contact the host.'
       );
     }
     items = [{ name: r.propertyTitle, description: `${nights} night${nights === 1 ? '' : 's'}, ${stay}`, pesos: quote.subtotal }];

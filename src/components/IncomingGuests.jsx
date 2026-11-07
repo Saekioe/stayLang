@@ -9,7 +9,7 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import {
   PAYMENT_LABELS, STATUS_LABELS, money, paymentStatusOf, refundReservation, statusOf,
 } from '../dataqueries/Booking';
-import { CHARGE_LABELS, reservationCharges, todayISO } from '../dataqueries/Pricing';
+import { CHARGE_LABELS, hostPayout, reservationCharges, todayISO } from '../dataqueries/Pricing';
 import {
   MAX_DAMAGE_PHOTOS, cancelReservation, compressPhoto, confirmReservation, declineReservation, reportDamage,
 } from '../dataqueries/Reservation';
@@ -416,6 +416,12 @@ export default function IncomingGuests({ properties, reservations, reviewsByRese
               {c.cancellationFee > 0 && <Line label="Cancellation fee" value={money(c.cancellationFee)} />}
               {c.damage > 0 && <Line label="Damage charge" value={money(c.damage)} />}
               {(c.cancellationFee > 0 || c.damage > 0) && <Line label="All charges" value={money(c.finalTotal)} bold />}
+              {c.hostFee > 0 && (
+                <>
+                  <Line label={`Host service fee (${c.hostFeePercent}%)`} value={`-${money(c.hostFee)}`} />
+                  <Line label="Your payout" value={money(hostPayout(current))} bold />
+                </>
+              )}
 
               <Divider sx={{ my: 1.5 }} />
               <Typography sx={{ fontWeight: 700, mb: 0.5 }}>Status</Typography>

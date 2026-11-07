@@ -98,6 +98,8 @@ export async function createReservation({ place, user, profile, checkIn, checkOu
     cleaningFee: quote.cleaningFee,
     serviceFeePercent: quote.serviceFeePercent,
     serviceFee: quote.serviceFee,
+    // Fixed when the booking is requested: later changes in Settings only affect new bookings.
+    hostFeePercent: quote.hostFeePercent ?? 0,
     total: quote.total,
 
     currency: 'PHP',

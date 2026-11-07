@@ -141,7 +141,7 @@ function Details({ place, onClose }) {
 
   const nights = nightsCount(checkIn, checkOut); // check-out day is not a night
 
-  const { serviceFeePercent } = usePlatformSettings();
+  const { serviceFeePercent, hostFeePercent } = usePlatformSettings();
   const bookedNights = useBookedNights(place.id);
 
   const quote = computeQuote({
@@ -149,6 +149,7 @@ function Details({ place, onClose }) {
     nights,
     cleaningFee: place.cleaningFee,
     serviceFeePercent,
+    hostFeePercent,
   });
 
   // Limits set by the host. Older listings only have `capacity`, so they fall back to it.

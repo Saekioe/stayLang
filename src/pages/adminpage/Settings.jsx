@@ -111,6 +111,10 @@ export default function Settings() {
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
 
   const savePlatform = async () => {
+    // Number('') is 0, so an empty box would silently save a 0% fee.
+    if ([form.guestFee, form.hostFee].some((v) => String(v).trim() === '')) {
+      return setFormError('Enter both fees (type 0 for no fee).');
+    }
     const guestFee = Number(form.guestFee);
     const hostFee = Number(form.hostFee);
     if ([guestFee, hostFee].some((n) => Number.isNaN(n) || n < 0 || n > 100)) {
@@ -247,7 +251,7 @@ export default function Settings() {
                 type="number"
                 value={form.guestFee}
                 onChange={setField('guestFee')}
-                helperText="Added on top of the booking price. Existing unpaid bookings keep their old price and must be requested again."
+                helperText="Added on top of the booking price. Applies to new booking requests; existing bookings keep the fee they were requested with."
                 slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
               />
               <TextField
@@ -256,8 +260,7 @@ export default function Settings() {
                 type="number"
                 value={form.hostFee}
                 onChange={setField('hostFee')}
-                disabled
-                helperText="Not applied to host payouts yet"
+                helperText="Taken from the host's earnings (nights + cleaning fee). Applies to new booking requests only."
                 slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
               />
             </Box>
@@ -267,8 +270,21 @@ export default function Settings() {
               label="Support email"
               value={form.supportEmail}
               onChange={setField('supportEmail')}
-              helperText="Shown to users, for example on the suspended account message"
+              helperText="Shown to users, for example on the suspended account message and the maintenance page"
             />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.maintenance}
+                  onChange={(e) => setForm((f) => ({ ...f, maintenance: e.target.checked }))}
+                />
+              }
+              label="Maintenance mode"
+            />
+            <Typography sx={{ fontSize: 12, color: colors.muted, mt: -2.25, ml: 1.75 }}>
+              When on, everyone except the admin sees a maintenance page. Payments already in progress still complete.
+            </Typography>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
               <Button disabled={!dirty || busy} onClick={() => { setForm(saved); setFormError(''); }}>

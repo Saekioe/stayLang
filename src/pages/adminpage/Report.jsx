@@ -20,7 +20,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 
-import { money, statusOf, paymentStatusOf } from "../../dataqueries/Booking";
+import { money, statusOf, paymentStatusOf, platformIncome } from "../../dataqueries/Booking";
 import { PageHeader, StatCard, colors } from "./adminUi";
 
 const RED = "#D32F2F";
@@ -157,7 +157,7 @@ function createRevenueTrendData(reservations, mode, start, end) {
     );
 
     if (bucket) {
-      bucket.value += Number(reservation.serviceFee) || 0;
+      bucket.value += platformIncome(reservation);
     }
   });
 
@@ -425,7 +425,7 @@ function getTopProperties(reservations) {
     }
 
     if (paymentStatusOf(reservation) === "paid") {
-      property.revenue += Number(reservation.serviceFee) || 0;
+      property.revenue += platformIncome(reservation);
     }
   });
 
@@ -618,7 +618,7 @@ export default function Report() {
   );
 
   const totalEarnings = paidReservations.reduce(
-    (sum, r) => sum + (Number(r.serviceFee) || 0),
+    (sum, r) => sum + platformIncome(r),
     0,
   );
 

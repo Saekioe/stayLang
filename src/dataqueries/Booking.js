@@ -29,7 +29,7 @@ export const DEFAULT_SERVICE_FEE_PERCENT = 10;
 // Platform-wide settings, kept in Firestore at settings/platform.
 // Falls back to the default if the document is missing or cannot be read.
 export function usePlatformSettings() {
-  const [settings, setSettings] = useState({ serviceFeePercent: DEFAULT_SERVICE_FEE_PERCENT });
+  const [settings, setSettings] = useState({ serviceFeePercent: DEFAULT_SERVICE_FEE_PERCENT, hostFeePercent: 0 });
 
   useEffect(
     () =>
@@ -40,7 +40,11 @@ export function usePlatformSettings() {
           // `guestFee` is what the admin saves in Settings; `serviceFeePercent` is the older name.
           const d = snap.data();
           const pct = Number(d.guestFee ?? d.serviceFeePercent);
-          if (Number.isFinite(pct) && pct >= 0) setSettings({ serviceFeePercent: pct });
+          const hostPct = Number(d.hostFee ?? 0);
+          setSettings({
+            serviceFeePercent: Number.isFinite(pct) && pct >= 0 ? pct : DEFAULT_SERVICE_FEE_PERCENT,
+            hostFeePercent: Number.isFinite(hostPct) && hostPct >= 0 ? hostPct : 0,
+          });
         },
         () => {}
       ),
@@ -188,7 +192,7 @@ export const confirmPayment = (reservationId, purpose = 'booking', sessionId) =>
 export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });
 
 export {
-  todayISO, nightsBetween, nightsCount, computeQuote, hostPayout,
+  todayISO, nightsBetween, nightsCount, computeQuote, hostPayout, platformIncome,
   cancellationFee, reservationCharges, amountDue, amountPaid,
 } from './Pricing';
 export {

@@ -27,13 +27,16 @@ export const nightsBetween = (checkIn, checkOut) =>
 
 // ---------- quote (used when booking) ----------
 // service fee = percent of (nights subtotal + cleaning fee)
-export function computeQuote({ pricePerNight, nights, cleaningFee = 0, serviceFeePercent = 0 }) {
+export function computeQuote({ pricePerNight, nights, cleaningFee = 0, serviceFeePercent = 0, hostFeePercent = 0 }) {
   const n = Math.max(0, Math.floor(Number(nights) || 0));
   const nightlyRate = round2(pricePerNight);
   const subtotal = round2(nightlyRate * n);
   const cleaning = n > 0 ? round2(cleaningFee) : 0;
   const percent = Number(serviceFeePercent) || 0;
   const serviceFee = round2(((subtotal + cleaning) * percent) / 100);
+  // The host fee is taken from the host's earnings. It is NOT added to what the guest pays.
+  const hostPercent = Number(hostFeePercent) || 0;
+  const hostFee = round2(((subtotal + cleaning) * hostPercent) / 100);
   return {
     nightlyRate,
     nights: n,
@@ -41,6 +44,8 @@ export function computeQuote({ pricePerNight, nights, cleaningFee = 0, serviceFe
     cleaningFee: cleaning,
     serviceFeePercent: percent,
     serviceFee,
+    hostFeePercent: hostPercent,
+    hostFee,
     total: round2(subtotal + cleaning + serviceFee),
   };
 }
@@ -74,6 +79,9 @@ export function reservationCharges(r) {
   const subtotal = round2(r.subtotal ?? nightlyRate * n);
   const cleaningFee = round2(r.cleaningFee ?? 0);
   const serviceFee = round2(r.serviceFee ?? 0);
+  // Fee taken from the host's earnings, fixed when the booking was requested (0 on older bookings)
+  const hostFeePercent = Number(r.hostFeePercent) || 0;
+  const hostFee = round2(((subtotal + cleaningFee) * hostFeePercent) / 100);
   // Old reservations without parts fall back to the stored total
   const hasParts = r.subtotal != null;
   const bookingTotal = hasParts ? round2(subtotal + cleaningFee + serviceFee) : round2(r.total ?? 0);
@@ -86,6 +94,8 @@ export function reservationCharges(r) {
     cleaningFee,
     serviceFeePercent: r.serviceFeePercent ?? 0,
     serviceFee,
+    hostFeePercent,
+    hostFee,
     bookingTotal,
     cancellationFee: cancellationFeeAmount,
     damage,
@@ -117,11 +127,18 @@ export function amountPaid(r) {
   );
 }
 
-// What the host earns: nights + cleaning (service fee stays with the platform) + paid damage
+// What the host earns: nights + cleaning, minus the host service fee, + paid damage.
+// (The guest service fee stays with the platform and is never part of the host's earnings.)
 export function hostPayout(r) {
   const c = reservationCharges(r);
   const base = r.subtotal != null ? c.subtotal + c.cleaningFee : Math.max(0, c.bookingTotal - c.serviceFee);
-  return round2(base + (r.damageStatus === 'paid' ? c.damage : 0));
+  return round2(Math.max(0, base - c.hostFee) + (r.damageStatus === 'paid' ? c.damage : 0));
+}
+
+// What the platform keeps from one booking: the guest service fee plus the host service fee.
+export function platformIncome(r) {
+  const c = reservationCharges(r);
+  return round2(c.serviceFee + c.hostFee);
 }
 
 export const CHARGE_LABELS = { unpaid: 'Unpaid', paid: 'Paid' };
