@@ -41,6 +41,7 @@ import { db } from "../../firebase/firebase";
 import { useAuth, isAdminEmail } from "../../auth/Auth";
 import { colors } from "./adminUi";
 import adminLogo from "../../assets/logo.png";
+import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 
 import Overview from "./Overview";
 import UserManagement from "./UserManagement";
@@ -51,6 +52,7 @@ import ReviewModeration from "./ReviewModeration";
 import Report from "./Report";
 import Settings from "./Settings";
 import AdminNotifications from "./AdminNotifications";
+import DealsManagement from './DealManager';
 
 const BASE = "/admin";
 const SIDEBAR_WIDTH = 230;
@@ -105,6 +107,12 @@ const menuItems = [
     path: `${BASE}/settings`,
     Icon: TuneOutlinedIcon,
   },
+  {
+    label: "Deals Management",
+    crumb: "Deals Management",
+    path: `${BASE}/deals`,
+    Icon: LocalOfferOutlinedIcon,
+  }
 ];
 
 const avatarSx = {
@@ -487,6 +495,7 @@ export default function AdminDashboard() {
             <Route path="reviews" element={<ReviewModeration />} />
             <Route path="reports" element={<Report />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="deals" element={<DealsManagement />} />
             <Route path="*" element={<Navigate to={BASE} replace />} />
           </Routes>
         </Box>

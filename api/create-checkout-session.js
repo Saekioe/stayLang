@@ -23,12 +23,17 @@ export async function POST(request) {
 
   let charge;
   try {
-    const propertySnap = purpose === 'booking' ? await db.collection('properties').doc(r.propertyId).get() : null;
-    const settingsSnap = purpose === 'booking' ? await db.doc('settings/platform').get() : null;
+    const isBooking = purpose === 'booking';
+    const propertySnap = isBooking ? await db.collection('properties').doc(r.propertyId).get() : null;
+    const settingsSnap = isBooking ? await db.doc('settings/platform').get() : null;
+    // The deal (if any) tells the server which discounted rate is allowed for this property
+    const dealSnap = isBooking ? await db.collection('deals').doc(r.propertyId).get() : null;
+
     charge = buildCharge({
       purpose,
       r,
       property: propertySnap?.exists ? propertySnap.data() : null,
+      deal: dealSnap?.exists ? dealSnap.data() : null,
       settings: settingsSnap?.exists ? settingsSnap.data() : null,
       requestedDay: manilaDay(r.cancellationRequestedAt),
     });

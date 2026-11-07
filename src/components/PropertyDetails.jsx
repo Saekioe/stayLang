@@ -140,12 +140,15 @@ function Details({ place, onClose }) {
   const isOwner = Boolean(user) && user.uid === place.ownerId;
 
   const nights = nightsCount(checkIn, checkOut); // check-out day is not a night
+  // Deal price (from the Deals section) replaces the normal nightly rate
+const basePrice = Number(place.pricePerNight) || 0;
+const nightlyPrice = place.dealPrice ?? basePrice;
 
   const { serviceFeePercent, hostFeePercent } = usePlatformSettings();
   const bookedNights = useBookedNights(place.id);
 
   const quote = computeQuote({
-    pricePerNight: place.pricePerNight,
+    pricePerNight: nightlyPrice,
     nights,
     cleaningFee: place.cleaningFee,
     serviceFeePercent,
@@ -960,7 +963,15 @@ function Details({ place, onClose }) {
                     color: '#222222',
                   }}
                 >
-                  {money(place.pricePerNight)}
+                
+                  {money(nightlyPrice)}
+                  {nightlyPrice !== basePrice && (
+                    <Typography
+                      sx={{ color: '#999999', fontSize: '0.85rem', textDecoration: 'line-through', ml: 0.5 }}
+                    >
+                      {money(basePrice)}
+                    </Typography>
+                  )}
                 </Typography>
 
                 <Typography

@@ -8,6 +8,12 @@ export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // Today in Philippine time, same format as reservation.checkIn / checkOut
 export const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
+// Nightly rate after a deal discount. The Firestore rules use the same formula.
+export const dealRate = (base, percent) => {
+  const pct = Math.min(100, Math.max(0, Number(percent) || 0));
+  return Math.round((Number(base) * (100 - pct)) / 100);
+};
+
 // Whole-day number, so date math never has time zone surprises
 export const dayNum = (iso) => {
   const [y, m, d] = iso.split('-').map(Number);

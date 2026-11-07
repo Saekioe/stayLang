@@ -3,7 +3,9 @@
 // never disagree about rounding or fees.
 //
 // NOTE: Pricing.js must stay free of browser-only imports, because the server loads it too.
-import { cancellationFee, computeQuote, nightsCount, round2, todayISO } from '../src/dataqueries/Pricing.js';
+import {
+  cancellationFee, computeQuote, dealRate, nightsCount, round2, todayISO,
+} from '../src/dataqueries/Pricing.js';
 
 // Must match DEFAULT_SERVICE_FEE_PERCENT and usePlatformSettings() in src/dataqueries/Booking.js.
 export const DEFAULT_SERVICE_FEE_PERCENT = 10;
@@ -16,10 +18,22 @@ export const servicePercent = (settings) => {
 
 // A booking keeps the guest service fee it was requested with, so a later change in Settings
 // never strands an unpaid booking. Older bookings without one use the current fee.
-// (firestore.rules makes sure a new booking can only be created with the fee in force at that time.)
 export const bookingFeePercent = (r, settings) => {
   const pct = Number(r.serviceFeePercent);
   return r.serviceFeePercent != null && Number.isFinite(pct) && pct >= 0 ? pct : servicePercent(settings);
+};
+
+// The nightly rate this booking may be charged at: the normal listing rate, or the
+// discounted rate of an active deal. Anything else is rejected (returns null).
+export const allowedNightlyRate = (r, property, deal) => {
+  const base = Number(property.pricePerNight);
+  const saved = Number(r.nightlyRate);
+  if (!Number.isFinite(saved)) return base; // older bookings have no saved rate
+  if (Math.abs(saved - base) < 0.005) return base;
+  if (deal && deal.active !== false && Math.abs(saved - dealRate(base, deal.discountPercent)) < 0.005) {
+    return saved;
+  }
+  return null;
 };
 
 export const PURPOSES = ['booking', 'cancellation', 'damage'];
@@ -35,10 +49,11 @@ export class ChargeError extends Error {
 // Returns { items: [{ name, description, pesos }], total } or throws ChargeError.
 //   r            the reservation, as stored in Firestore ({ id, ...data })
 //   property     the listing (booking payments are re-priced from it)
+//   deal         the deals/{propertyId} document, or null if there is none
 //   settings     settings/platform
 //   today        today in Philippine time (YYYY-MM-DD)
 //   requestedDay the day a cancellation fee was requested (fees are fixed on that day)
-export function buildCharge({ purpose, r, property, settings, today = todayISO(), requestedDay }) {
+export function buildCharge({ purpose, r, property, deal = null, settings, today = todayISO(), requestedDay }) {
   const stay = `${r.checkIn} to ${r.checkOut}`;
   let items;
 
@@ -48,10 +63,18 @@ export function buildCharge({ purpose, r, property, settings, today = todayISO()
     if (r.checkOut < today) throw new ChargeError('This stay has already ended.');
     if (!property) throw new ChargeError('This listing no longer exists.');
 
-    // Never trust the amount saved by the browser: price it again from the listing.
+    // Never trust the amount saved by the browser: price it again from the listing,
+    // using the normal rate or the deal rate.
+    const nightlyRate = allowedNightlyRate(r, property, deal);
+    if (nightlyRate == null) {
+      throw new ChargeError(
+        'The price of this booking no longer matches the listing. Please contact the host.'
+      );
+    }
+
     const nights = nightsCount(r.checkIn, r.checkOut);
     const quote = computeQuote({
-      pricePerNight: property.pricePerNight,
+      pricePerNight: nightlyRate,
       nights,
       cleaningFee: property.cleaningFee,
       serviceFeePercent: bookingFeePercent(r, settings),

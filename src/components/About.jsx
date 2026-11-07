@@ -1,17 +1,13 @@
 import { useRef, useState } from 'react';
-import { Box, Container, IconButton, Typography } from '@mui/material';
+import { Box, Button, Container, IconButton, Typography } from '@mui/material';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import useMonthlyDeals from '../dataqueries/UseMonthlyDeals';
+import PropertyDetails from './PropertyDetails';
 
-// Empty cards. Fill in any field and it will show up on the card.
-// Example: { id: 1, name: 'Hotel name', location: 'City, Country', score: '8.7',
-//   reviews: '1,123', badge: 'Limited-time Deal', price: '2,456,000đ',
-//   oldPrice: '2,756,000đ', image: '/images/hotel-1.jpg' }
-const deals = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
-
-function DealCard({ deal }) {
+function DealCard({ deal, onBook }) {
   const [liked, setLiked] = useState(false);
 
   return (
@@ -118,8 +114,8 @@ function DealCard({ deal }) {
           </Box>
         )}
 
-        {deal.price && (
-          <Box sx={{ mt: 'auto', pt: 3 }}>
+        <Box sx={{ mt: 'auto', pt: 3 }}>
+          {deal.price && (
             <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 1 }}>
               <Typography sx={{ fontSize: 18, fontWeight: 700, color: '#1d1d1f' }}>
                 {deal.price}
@@ -130,8 +126,26 @@ function DealCard({ deal }) {
                 </Typography>
               )}
             </Box>
-          </Box>
-        )}
+          )}
+
+          {deal.place && (
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={() => onBook(deal.place)}
+              sx={{
+                mt: 1.5,
+                bgcolor: '#1f4a9c',
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: '#173a7d', boxShadow: 'none' },
+              }}
+            >
+              Book now
+            </Button>
+          )}
+        </Box>
       </Box>
     </Box>
   );
@@ -139,6 +153,8 @@ function DealCard({ deal }) {
 
 export default function About() {
   const trackRef = useRef(null);
+  const { deals, loading } = useMonthlyDeals();
+  const [selected, setSelected] = useState(null);
 
   const scrollByCard = (dir) => {
     const el = trackRef.current;
@@ -156,6 +172,9 @@ export default function About() {
     borderRadius: '11px',
     '&:hover': { bgcolor: '#eef2fa' },
   };
+
+  // Hide the whole section when there is nothing to show
+  if (loading || deals.length === 0) return null;
 
   return (
     <Container
@@ -238,10 +257,16 @@ export default function About() {
           }}
         >
           {deals.map((deal) => (
-            <DealCard key={deal.id} deal={deal} />
+            <DealCard key={deal.id} deal={deal} onBook={setSelected} />
           ))}
         </Box>
       </Box>
+
+      <PropertyDetails
+        place={selected}
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+      />
     </Container>
   );
 }
