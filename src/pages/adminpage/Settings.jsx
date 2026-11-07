@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, InputAdornment, Switch, TextField, Typography,
+  InputAdornment, TextField, Typography,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
@@ -17,7 +17,7 @@ const CATEGORY_FIELD = 'type';
 // Same list hosts see until the admin saves their own.
 const DEFAULT_CATEGORIES = DEFAULT_PROPERTY_TYPES;
 // 10 matches DEFAULT_SERVICE_FEE_PERCENT in Booking.js, so the form shows the fee guests really pay.
-const DEFAULT_PLATFORM = { guestFee: '10', hostFee: '0', maintenance: false, supportEmail: '' };
+const DEFAULT_PLATFORM = { guestFee: '10', hostFee: '0', supportEmail: '' };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Settings() {
@@ -48,7 +48,6 @@ export default function Settings() {
       const next = {
         guestFee: String(d.guestFee ?? d.serviceFeePercent ?? 10),
         hostFee: String(d.hostFee ?? 0),
-        maintenance: Boolean(d.maintenance),
         supportEmail: d.supportEmail ?? '',
       };
       setSaved(next);
@@ -132,7 +131,6 @@ export default function Settings() {
         guestFee,
         serviceFeePercent: guestFee,
         hostFee,
-        maintenance: form.maintenance,
         supportEmail: form.supportEmail.trim(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
@@ -155,7 +153,7 @@ export default function Settings() {
 
       <PageHeader
         title="Categories & Platform Settings"
-        subtitle="Control property categories, service fees and site availability across Pahinga."
+        subtitle="Control property categories and service fees across Pahinga."
       />
 
       <Panel title="Manage Property Categories" subtitle="Add and remove categories used to organize properties">
@@ -240,7 +238,7 @@ export default function Settings() {
       </Panel>
 
       <Box sx={{ mt: 3 }}>
-        <Panel title="Platform Settings" subtitle="Service fees, contact details and site availability">
+        <Panel title="Platform Settings" subtitle="Service fees and contact details">
           <Box sx={{ px: 2.75, pb: 3, display: 'grid', gap: 2.5 }}>
             {formError && <Alert severity="error" onClose={() => setFormError('')}>{formError}</Alert>}
 
@@ -270,21 +268,8 @@ export default function Settings() {
               label="Support email"
               value={form.supportEmail}
               onChange={setField('supportEmail')}
-              helperText="Shown to users, for example on the suspended account message and the maintenance page"
+              helperText="Shown to users, for example on the suspended account message"
             />
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.maintenance}
-                  onChange={(e) => setForm((f) => ({ ...f, maintenance: e.target.checked }))}
-                />
-              }
-              label="Maintenance mode"
-            />
-            <Typography sx={{ fontSize: 12, color: colors.muted, mt: -2.25, ml: 1.75 }}>
-              When on, everyone except the admin sees a maintenance page. Payments already in progress still complete.
-            </Typography>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
               <Button disabled={!dirty || busy} onClick={() => { setForm(saved); setFormError(''); }}>
