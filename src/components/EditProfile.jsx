@@ -152,6 +152,8 @@ function ChangePasswordDialog({ open, onClose, user }) {
 // --- Main Profile Form Component ---
 function ProfileForm({ onClose, user, profile }) {
   const { setProfile } = useAuth();
+  // A Google-only account has no password on this site: Google owns it, so there is nothing to change here.
+  const hasPassword = user?.providerData?.some((p) => p.providerId === 'password') ?? true;
   const [firstName, setFirstName] = useState(profile?.firstName || '');
   const [lastName, setLastName] = useState(profile?.lastName || '');
   const [phone, setPhone] = useState(profile?.phone || '');
@@ -261,16 +263,34 @@ function ProfileForm({ onClose, user, profile }) {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
               <Box sx={{ fontWeight: 600, fontSize: '0.9rem' }}>Password</Box>
-              <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>Protect your account with a secure password</Box>
+              <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
+                {hasPassword
+                  ? 'Protect your account with a secure password'
+                  : 'You signed in with Google, so your password is managed in your Google account.'}
+              </Box>
             </Box>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPasswordDialogOpen(true)}
-              sx={{ borderRadius: '1px', textTransform: 'none' }}
-            >
-              Change Password
-            </Button>
+            {hasPassword ? (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setPasswordDialogOpen(true)}
+                sx={{ borderRadius: '1px', textTransform: 'none' }}
+              >
+                Change Password
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                size="small"
+                component="a"
+                href="https://myaccount.google.com/security"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ borderRadius: '1px', textTransform: 'none', whiteSpace: 'nowrap', ml: 2 }}
+              >
+                Google account
+              </Button>
+            )}
           </Box>
         </Box>
       </DialogContent>
@@ -285,11 +305,13 @@ function ProfileForm({ onClose, user, profile }) {
       </DialogActions>
 
       {/* Sub-dialog for changing password */}
-      <ChangePasswordDialog
-        open={passwordDialogOpen}
-        onClose={() => setPasswordDialogOpen(false)}
-        user={user}
-      />
+      {hasPassword && (
+        <ChangePasswordDialog
+          open={passwordDialogOpen}
+          onClose={() => setPasswordDialogOpen(false)}
+          user={user}
+        />
+      )}
     </>
   );
 }
