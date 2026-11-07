@@ -56,7 +56,9 @@ export async function POST(request) {
       client_reference_id: reservationId,
       customer_email: r.guestEmail || undefined,
       metadata: { reservationId, guestId: user.uid, purpose },
-      success_url: `${origin}/my-bookings?payment=success&purpose=${purpose}`,
+      // {CHECKOUT_SESSION_ID} is filled in by Stripe. The page uses it to confirm the payment
+      // even if the webhook has not arrived yet (see /api/confirm-payment).
+      success_url: `${origin}/my-bookings?payment=success&purpose=${purpose}&reservation=${reservationId}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/my-bookings?payment=cancelled&purpose=${purpose}`,
     });
     return json({ url: session.url });

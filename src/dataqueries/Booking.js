@@ -180,6 +180,10 @@ export async function startCheckout(reservation, purpose = 'booking') {
   window.location.assign(url);
 }
 
+// Asks the server to check with Stripe and mark the payment as paid. Safe to call many times.
+export const confirmPayment = (reservationId, purpose = 'booking', sessionId) =>
+  callApi('confirm-payment', { reservationId, purpose, sessionId });
+
 // Full refund for a cancelled booking that was paid.
 export const refundReservation = (reservation) => callApi('refund-reservation', { reservationId: reservation.id });
 

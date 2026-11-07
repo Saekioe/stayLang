@@ -11,7 +11,7 @@ import { db } from '../firebase/firebase';
 import { useAuth } from '../auth/Auth';
 import NavigationBar from '../components/NavigationBar';
 import {
-  PAYMENT_LABELS, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf,
+  PAYMENT_LABELS, confirmPayment, money, paymentMethodLabel, paymentStatusOf, refundReservation, startCheckout, statusOf,
 } from '../dataqueries/Booking';
 import {
   CANCELLATION_TIERS, CHARGE_LABELS, amountPaid, cancellationFee, reservationCharges, todayISO,
@@ -116,6 +116,30 @@ export default function MyBookings() {
   const [saving, setSaving] = useState(false);
 
   const finalizing = useRef(new Set());
+
+  // Back from Stripe: do not wait for the webhook. Ask the server to check the payment with
+  // Stripe directly. It is idempotent, so it is harmless if the webhook already did the work.
+  const returnedReservation = searchParams.get('reservation');
+  const returnedSession = searchParams.get('session_id');
+  const returnedPurpose = searchParams.get('purpose') || 'booking';
+  useEffect(() => {
+    if (!uid || paymentResult !== 'success' || !returnedReservation || !returnedSession) return undefined;
+    let stop = false;
+    (async () => {
+      // A few tries: some payment methods (e.g. e-wallets) settle a little later.
+      for (let attempt = 0; attempt < 5 && !stop; attempt += 1) {
+        try {
+          const { status } = await confirmPayment(returnedReservation, returnedPurpose, returnedSession);
+          if (status !== 'unpaid') return;
+        } catch (err) {
+          if (!stop) setError(err.message || 'We could not confirm your payment yet.');
+          return;
+        }
+        await new Promise((resolve) => { setTimeout(resolve, 2000); });
+      }
+    })();
+    return () => { stop = true; };
+  }, [uid, paymentResult, returnedReservation, returnedSession, returnedPurpose]);
 
   // Cancel for real: status, dates and notifications change in one transaction, then refund if paid.
   const finishCancellation = async (b) => {
