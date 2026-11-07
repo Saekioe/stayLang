@@ -18,7 +18,7 @@ import dayjs from 'dayjs';
 import NavigationBar from '../components/NavigationBar';
 import { PlaceGrid } from '../components/Places';
 import { usePlaces, usePropertyTypes } from '../dataqueries/Data';
-import { nightsBetween, todayISO, useUnavailablePropertyIds } from '../dataqueries/Booking';
+import { nightsBetween, useUnavailablePropertyIds } from '../dataqueries/Booking';
 
 export default function FindPlaces() {
   const { places, error } = usePlaces();
@@ -28,8 +28,10 @@ export default function FindPlaces() {
   const [propertyType, setPropertyType] = useState('all');
   const [minBedrooms, setMinBedrooms] = useState('all');
   const [minGuests, setMinGuests] = useState('all');
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
+  const [checkInDate, setCheckInDate] = useState(null); // dayjs or null
+  const [checkOutDate, setCheckOutDate] = useState(null);
+  const checkIn = checkInDate?.isValid() ? checkInDate.format('YYYY-MM-DD') : '';
+  const checkOut = checkOutDate?.isValid() ? checkOutDate.format('YYYY-MM-DD') : '';
   const unavailable = useUnavailablePropertyIds(checkIn, checkOut);
   const stayNights = checkIn && checkOut ? nightsBetween(checkIn, checkOut).length : 0;
 
@@ -57,8 +59,8 @@ export default function FindPlaces() {
     setPropertyType('all');
     setMinBedrooms('all');
     setMinGuests('all');
-    setCheckIn('');
-    setCheckOut('');
+    setCheckInDate(null);
+    setCheckOutDate(null);
   };
 
   const hasActiveFilters = q || maxPrice || propertyType !== 'all' || minBedrooms !== 'all' || minGuests !== 'all' || checkIn || checkOut;
@@ -145,20 +147,22 @@ export default function FindPlaces() {
             {/* Dates: only places free for the whole stay are shown */}
             <DatePicker
               label="Check-in"
-              value={checkIn ? dayjs(checkIn) : null}
-              minDate={dayjs(todayISO())}
+              value={checkInDate}
+              disablePast
               onChange={(v) => {
-                const iso = v?.isValid() ? v.format('YYYY-MM-DD') : '';
-                setCheckIn(iso);
-                if (iso && checkOut && checkOut <= iso) setCheckOut('');
+                setCheckInDate(v);
+                // a check-out on or before the new check-in is no longer valid
+                if (v?.isValid() && checkOutDate?.isValid() && !checkOutDate.isAfter(v, 'day')) {
+                  setCheckOutDate(null);
+                }
               }}
               slotProps={{ textField: { size: 'small', sx: { width: 165, bgcolor: '#fff' } } }}
             />
             <DatePicker
               label="Check-out"
-              value={checkOut ? dayjs(checkOut) : null}
-              minDate={checkIn ? dayjs(checkIn).add(1, 'day') : dayjs(todayISO()).add(1, 'day')}
-              onChange={(v) => setCheckOut(v?.isValid() ? v.format('YYYY-MM-DD') : '')}
+              value={checkOutDate}
+              minDate={checkInDate?.isValid() ? checkInDate.add(1, 'day') : dayjs().add(1, 'day')}
+              onChange={(v) => setCheckOutDate(v)}
               slotProps={{ textField: { size: 'small', sx: { width: 165, bgcolor: '#fff' } } }}
             />
 

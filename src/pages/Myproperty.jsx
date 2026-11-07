@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  Fade, IconButton, LinearProgress, Link, MenuItem, Paper, Rating,
+  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  Fade, IconButton, LinearProgress, MenuItem, Paper, Rating,
   Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -21,7 +21,8 @@ import HostApplication from '../components/HostApplication';
 import { useHostApplication } from '../dataqueries/Host';
 import { money } from '../dataqueries/Booking';
 import { hostPayout, todayISO } from '../dataqueries/Pricing';
-import IncomingGuests from '../components/IncomingGuests';
+import GuestManagement from '../components/GuestManagement';
+import { bucketOf, countGuests } from '../dataqueries/GuestBuckets';
 
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -65,7 +66,8 @@ const rowSx = {
 function computeStats(properties, reservations, reviews) {
   const today = dayNum(toISODate(new Date()));
   const confirmed = reservations.filter((r) => r.status === 'confirmed');
-  const pending = reservations.filter((r) => r.status === 'pending');
+  // Same rule as the Incoming guests list: only pending requests count.
+  const pending = reservations.filter((r) => bucketOf(r) === 'incoming');
   const declined = reservations.filter((r) => r.status === 'declined');
 
   const earnings = confirmed.reduce((sum, r) => sum + hostPayout(r), 0);
@@ -157,7 +159,7 @@ function Dashboard({ properties, reservations, reviews }) {
         <StatCard
           label="Awaiting your reply"
           value={s.pending.length}
-          note={s.pending.length ? 'Reply in Incoming guests' : 'You are all caught up'}
+          note={s.pending.length ? 'Reply in Guests' : 'You are all caught up'}
           highlight={s.pending.length > 0}
         />
         <StatCard
@@ -514,7 +516,8 @@ export default function MyProperty() {
   const [reporting, setReporting] = useState(null);
   const [reportReason, setReportReason] = useState('');
   const [reportSaving, setReportSaving] = useState(false);
-  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 incoming guests, 3 reviews, 4 availability
+  const [tab, setTab] = useState(0); // 0 dashboard, 1 properties, 2 guests, 3 reviews, 4 availability
+  const [guestTab, setGuestTab] = useState('incoming'); // 'incoming' | 'current' | 'archived'
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -569,7 +572,9 @@ export default function MyProperty() {
     );
   }
   const formOpen = mode !== 'list' || (autoCreate && ready && properties.length === 0);
-  const pending = reservations.filter((r) => r.status === 'pending').length;
+  // One source of truth for every count on this page (see dataqueries/GuestBuckets.js)
+  const guestCounts = countGuests(reservations);
+  const pending = guestCounts.incoming;
   const firstName = profile?.firstName || user.displayName || '';
 
   const startCreate = () => {
@@ -610,7 +615,7 @@ export default function MyProperty() {
       setError(
         `"${p.title}" has ${plural(upcoming.length, 'upcoming booking')}. Decline or cancel ${
           upcoming.length === 1 ? 'it' : 'them'
-        } in Incoming guests before deleting this listing.`
+        } in Guests before deleting this listing.`
       );
       return;
     }
@@ -618,10 +623,7 @@ export default function MyProperty() {
     await deleteDoc(doc(db, 'properties', p.id)).catch(() => setError('Could not delete that listing.'));
   };
 
-
-
-
-  const requestsFor = (id) => reservations.filter((r) => r.propertyId === id && r.status === 'pending').length;
+  const requestsFor = (id) => reservations.filter((r) => r.propertyId === id && bucketOf(r) === 'incoming').length;
   const reviewsByReservation = Object.fromEntries(reviews.map((rv) => [rv.id, rv]));
 
   // Public reply to a guest's review.
@@ -680,7 +682,7 @@ export default function MyProperty() {
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
         {notice && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setNotice('')}>{notice}</Alert>}
 
-        {!ready &&(
+        {!ready && (
           <Box sx={{ py: 8, textAlign: 'center' }}><CircularProgress /></Box>
         )}
 
@@ -734,7 +736,10 @@ export default function MyProperty() {
                   size="small"
                   variant="contained"
                   disableElevation
-                  onClick={() => setTab(2)}
+                  onClick={() => {
+                    setGuestTab('incoming');
+                    setTab(2);
+                  }}
                   sx={{ bgcolor: '#fff', color: '#3F3636', '&:hover': { bgcolor: '#fff' } }}
                 >
                   Review requests
@@ -753,7 +758,16 @@ export default function MyProperty() {
             >
               <Tab label="Dashboard" />
               <Tab label={`Properties (${properties.length})`} />
-              <Tab label={`Incoming guests (${reservations.length})`} />
+              <Tab
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    Guests
+                    {pending > 0 && (
+                      <Chip size="small" label={pending} sx={{ bgcolor: '#FBF1C0', color: '#6B5200', height: 20, fontWeight: 700 }} />
+                    )}
+                  </Box>
+                }
+              />
               <Tab label={`Reviews (${reviews.length})`} />
               <Tab label="Availability" />
             </Tabs>
@@ -789,7 +803,9 @@ export default function MyProperty() {
                 )}
 
                 {tab === 2 && (
-                  <IncomingGuests
+                  <GuestManagement
+                    value={guestTab}
+                    onChange={setGuestTab}
                     properties={properties}
                     reservations={reservations}
                     reviewsByReservation={reviewsByReservation}
@@ -808,37 +824,37 @@ export default function MyProperty() {
         )}
       </Box>
 
-        <Dialog
-          open={formOpen}
-          onClose={(_, reason) => {
-            // Clicking the backdrop would throw away a half-filled form, so only Esc and Cancel close it.
-            if (reason !== 'backdropClick') closeForm();
-          }}
-          scroll="body"
-          maxWidth={false}
-          aria-label={editing ? 'Edit listing' : 'Create listing'}
-          slotProps={{
-            paper: {
-              sx: {
-                width: '100%',
-                maxWidth: 960,
-                m: { xs: 1, md: 4 },
-                bgcolor: 'transparent',
-                boxShadow: 'none',
-                backgroundImage: 'none',
-                overflow: 'visible',
-              },
+      <Dialog
+        open={formOpen}
+        onClose={(_, reason) => {
+          // Clicking the backdrop would throw away a half-filled form, so only Esc and Cancel close it.
+          if (reason !== 'backdropClick') closeForm();
+        }}
+        scroll="body"
+        maxWidth={false}
+        aria-label={editing ? 'Edit listing' : 'Create listing'}
+        slotProps={{
+          paper: {
+            sx: {
+              width: '100%',
+              maxWidth: 960,
+              m: { xs: 1, md: 4 },
+              bgcolor: 'transparent',
+              boxShadow: 'none',
+              backgroundImage: 'none',
+              overflow: 'visible',
             },
-            transition: { onExited: () => setEditing(null) },
-          }}
-        >
-          <ListingForm
-            key={editing?.id ?? 'new'}
-            initial={editing}
-            onDone={finishForm}
-            onCancel={closeForm}
-          />
-        </Dialog>
+          },
+          transition: { onExited: () => setEditing(null) },
+        }}
+      >
+        <ListingForm
+          key={editing?.id ?? 'new'}
+          initial={editing}
+          onDone={finishForm}
+          onCancel={closeForm}
+        />
+      </Dialog>
 
       <Dialog open={Boolean(replying)} onClose={closeReply} fullWidth maxWidth="sm" aria-labelledby="reply-title">
         <DialogTitle id="reply-title" sx={{ textAlign: 'left', color: '#3F3636', fontWeight: 700, fontSize: '1.25rem' }}>

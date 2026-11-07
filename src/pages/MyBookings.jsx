@@ -666,7 +666,7 @@ export default function MyBookings() {
 
       {/* Review dialog */}
       <Dialog open={Boolean(reviewing)} onClose={closeReview} fullWidth maxWidth="sm" aria-labelledby="review-title">
-        <DialogTitle id="review-title" sx={{ textAlign: 'left' }}>
+        <DialogTitle id="review-title" sx={{ textAlign: 'left', color: '#7A7070', fontSize: '1rem', fontWeight: 600 }}>
           {reviewing && reviews[reviewing.id] ? 'Edit your review' : 'Write a review'}
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'left' }}>

@@ -464,7 +464,7 @@ export default function IncomingGuests({ properties, reservations, reviewsByRese
 
       {/* Damage report */}
       <Dialog open={Boolean(damageFor)} onClose={closeDamage} fullWidth maxWidth="sm" aria-labelledby="damage-title">
-        <DialogTitle id="damage-title" sx={{ textAlign: 'left' }}>Report damage</DialogTitle>
+        <DialogTitle id="damage-title" sx={{ textAlign: 'left', color: '#333' }}>Report damage</DialogTitle>
         <DialogContent sx={{ textAlign: 'left' }}>
           {damageFor && (
             <Typography variant="body2" sx={{ color: '#7A7070', mb: 2 }}>
