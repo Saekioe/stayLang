@@ -33,7 +33,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import { money, useBookedNights, usePlatformSettings } from '../dataqueries/Booking';
-import { CANCELLATION_TIERS, computeQuote, nightsBetween, nightsCount } from '../dataqueries/Pricing';
+import { CANCELLATION_TIERS, computeQuote, nightsBetween, nightsCount, todayISO } from '../dataqueries/Pricing';
 import { createReservation } from '../dataqueries/Reservation';
 import { useAuth } from '../auth/Auth';
 import { usePropertyReviews } from '../dataqueries/Data';
@@ -184,6 +184,13 @@ function Details({ place, onClose }) {
   };
 
   const handleCheckIn = (value) => {
+    // minDate only greys out days in the calendar. A typed date still arrives here.
+    if (value && value < todayISO()) {
+      setCheckIn('');
+      setCheckOut('');
+      setNotice({ severity: 'error', text: 'Check-in cannot be in the past. Please choose today or a later date.' });
+      return;
+    }
     setCheckIn(value);
     setNotice(null);
 
@@ -233,6 +240,11 @@ function Details({ place, onClose }) {
     if (!user) {
       onClose();
       navigate('/login');
+      return;
+    }
+
+    if (checkIn && checkIn < todayISO()) {
+      setNotice({ severity: 'error', text: 'Check-in cannot be in the past. Please choose today or a later date.' });
       return;
     }
 
@@ -289,7 +301,9 @@ function Details({ place, onClose }) {
         text:
           error.message === 'clash'
             ? 'You already have a request for this place that overlaps these dates.'
-            : 'Could not send your request. Please try again.',
+            : error.message === 'past'
+              ? 'Check-in cannot be in the past. Please choose today or a later date.'
+              : 'Could not send your request. Please try again.',
       });
     } finally {
       setBusy(false);
@@ -828,6 +842,7 @@ function Details({ place, onClose }) {
                     : ''
                 )
               }
+              disablePast
               minDate={dayjs(today)}
               shouldDisableDate={(date) =>
                 bookedNights.includes(date.format('YYYY-MM-DD'))

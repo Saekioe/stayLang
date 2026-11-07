@@ -150,6 +150,10 @@ export default function FindPlaces() {
               value={checkInDate}
               disablePast
               onChange={(v) => {
+                if (v?.isValid() && v.isBefore(dayjs(), 'day')) {
+                  setCheckInDate(null); // typed past date
+                  return;
+                }
                 setCheckInDate(v);
                 // a check-out on or before the new check-in is no longer valid
                 if (v?.isValid() && checkOutDate?.isValid() && !checkOutDate.isAfter(v, 'day')) {

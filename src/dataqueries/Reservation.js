@@ -2,7 +2,7 @@ import {
   collection, doc, getDocs, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
-import { nightsBetween, nightsCount } from './Pricing';
+import { nightsBetween, nightsCount, todayISO } from './Pricing';
 
 export const MAX_DAMAGE_PHOTOS = 3;
 
@@ -57,6 +57,9 @@ export function compressPhoto(file, maxSize = 700, quality = 0.5) {
 export async function createReservation({ place, user, profile, checkIn, checkOut, party, quote }) {
   const nights = nightsCount(checkIn, checkOut);
   if (nights < 1) throw new Error('dates');
+  // A stay cannot start before today. The date pickers hint at this, but a typed date
+  // slips past them, so it is enforced here as well.
+  if (checkIn < todayISO()) throw new Error('past');
 
   const mine = await getDocs(
     query(
@@ -123,6 +126,9 @@ export async function createReservation({ place, user, profile, checkIn, checkOu
 // bookedNights ids are "<propertyId>_<date>" and cannot be overwritten (rules deny update),
 // so two bookings can never hold the same night, even with two hosts' tabs open.
 export async function confirmReservation(r) {
+  // A request whose check-in has already passed can only be declined.
+  if (r.checkIn < todayISO()) throw new Error('past');
+
   const nights = nightsBetween(r.checkIn, r.checkOut);
 
   // Queries cannot run inside a transaction, so find the rivals first and re-check them inside.

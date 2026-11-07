@@ -254,7 +254,9 @@ export default function IncomingGuests({ properties, reservations, reviewsByRese
           ? 'Those dates are not available (already booked or blocked), so this request cannot be confirmed. Decline it, open the dates, or cancel the other booking first.'
           : err.message === 'not-pending'
             ? 'This request was already handled.'
-            : 'Could not confirm that reservation.'
+            : err.message === 'past'
+              ? 'The check-in date for this request has already passed, so it cannot be confirmed. Please decline it.'
+              : 'Could not confirm that reservation.'
       );
     } finally {
       setBusyId('');
